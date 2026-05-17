@@ -165,7 +165,6 @@ http://localhost:3001
 ```bash
 cd client
 npm install --legacy-peer-deps
-npm install dotenv
 npm start
 ```
 
