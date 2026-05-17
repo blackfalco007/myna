@@ -1,2 +1,7 @@
 node_modules/
 .env
+/files/district_new.json
+/files/states.json
+Alappuzha.kml
+hotspotdata.json
+ZsavedCode.txt
