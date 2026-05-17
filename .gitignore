@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# environment files
+.env
+
+# macOS
+.DS_Store
+
+# logs
+npm-debug.log*
+
+# build artifacts
+build/
+dist/
+
+# local uploads/output
+uploads/
+output/
+
+# archives
+*.zip
+
+# large local data
+server/files/*.json
