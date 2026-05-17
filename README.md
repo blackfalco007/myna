@@ -314,7 +314,7 @@ docker ps
 Typical ports:
 
 - Frontend: 3000
-- Backend: 5000
+- Backend: 3001
 - Redis: 6379
 - PostgreSQL: 5432
 
@@ -322,4 +322,4 @@ Typical ports:
 
 # License
 
-Add project license information here.
+Users may use outputs for personal, educational, non-commercial research, and conservation-support purposes with attribution. Commercial redistribution or derivative services are prohibited.
