@@ -158,3 +158,149 @@ export const calculateZoom = (points) => {
 
   return { lat: 25.21, lng: 79.32 }; 
 };
+
+export const STATE_CODES = {
+  "Andaman and Nicobar Islands": "AN",
+  "Andhra Pradesh": "AP",
+  "Arunachal Pradesh": "AR",
+  "Assam": "AS",
+  "Bihar": "BR",
+  "Chandigarh": "CH",
+  "Chhattisgarh": "CG",
+  "Dadra and Nagar Haveli and Daman and Diu": "DN",
+  "Delhi": "DL",
+  "Goa": "GA",
+  "Gujarat": "GJ",
+  "Haryana": "HR",
+  "Himachal Pradesh": "HP",
+  "Jammu and Kashmir": "JK",
+  "Jharkhand": "JH",
+  "Karnataka": "KA",
+  "Kerala": "KL",
+  "Ladakh": "LA",
+  "Lakshadweep": "LD",
+  "Madhya Pradesh": "MP",
+  "Maharashtra": "MH",
+  "Manipur": "MN",
+  "Meghalaya": "ML",
+  "Mizoram": "MZ",
+  "Nagaland": "NL",
+  "Odisha": "OD",
+  "Puducherry": "PY",
+  "Punjab": "PB",
+  "Rajasthan": "RJ",
+  "Sikkim": "SK",
+  "Tamil Nadu": "TN",
+  "Telangana": "TS",
+  "Tripura": "TR",
+  "Uttar Pradesh": "UP",
+  "Uttarakhand": "UK",
+  "West Bengal": "WB"
+};
+
+export const cleanName = (str) => {
+
+  return str
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map(word =>
+      word.charAt(0).toUpperCase() +
+      word.slice(1)
+    )
+    .join("");
+};
+
+export const generateDefaultReportName = ({
+  uploadedFileName,
+  selectedState,
+  selectedCounty,
+  selectedLocality,
+  newPolygon,
+  dateSuffix
+}) => {
+
+  /* uploaded file */
+
+  if (uploadedFileName) {
+
+    const baseName = uploadedFileName
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-zA-Z0-9]/g, "_");
+
+    return `${baseName}_${dateSuffix}`
+      .slice(0, 35);
+  }
+
+  /* polygon */
+
+  if (newPolygon) {
+
+    return `CustomPolygon_${dateSuffix}`;
+  }
+
+  /* geography */
+
+  const stateCode =
+    STATE_CODES[selectedState] ||
+    cleanName(selectedState || "")
+      .slice(0, 2)
+      .toUpperCase();
+
+  const districtPart =
+    cleanName(selectedCounty || "")
+      .slice(0, 12);
+
+  const localityPart =
+    cleanName(selectedLocality || "");
+
+  /* state only */
+
+  if (selectedState && !selectedCounty) {
+
+    return `${stateCode}_${dateSuffix}`;
+  }
+
+  /* state + district */
+
+  if (
+    selectedState &&
+    selectedCounty &&
+    !selectedLocality
+  ) {
+
+    return `${stateCode}_${districtPart}_${dateSuffix}`
+      .slice(0, 35);
+  }
+
+  /* state + district + locality */
+
+  if (
+    selectedState &&
+    selectedCounty &&
+    selectedLocality
+  ) {
+
+    const prefix =
+      `${stateCode}_${districtPart}_`;
+
+    const suffix =
+      `_${dateSuffix}`;
+
+    const maxLocalityLength =
+      35 - prefix.length - suffix.length;
+
+    const trimmedLocality =
+      localityPart.slice(
+        0,
+        Math.max(maxLocalityLength, 0)
+      );
+
+    return `${prefix}${trimmedLocality}${suffix}`;
+  }
+
+  /* fallback */
+
+  return `MYNA_Report_${dateSuffix}`;
+};

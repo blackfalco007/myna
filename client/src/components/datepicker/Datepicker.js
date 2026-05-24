@@ -7,7 +7,10 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ClearIcon from '@mui/icons-material/Clear';
 import IconButton from '@mui/material/IconButton';
 
+import dayjs from 'dayjs';
+
 function DatePickerClear(props) {
+
   const { onClear, cleared } = props;
 
   const handleDateChange = (newValue) => {
@@ -18,19 +21,26 @@ function DatePickerClear(props) {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
+
       <DatePicker
         {...props}
+
         renderInput={(params) => (
+
           <div style={{ position: 'relative', display: 'inline-block' }}>
+
             <TextField
               sx={{
                 width: '100%',
                 opacity: isTextGray ? 0.7 : 1,
                 color: isTextGray ? 'rgba(0, 0, 0, 0.3)' : 'black',
               }}
+
               {...params}
             />
+
             {props.value && (
+
               <IconButton
                 style={{
                   position: 'absolute',
@@ -43,60 +53,116 @@ function DatePickerClear(props) {
               >
                 <ClearIcon sx={{ color: 'rgba(0, 0, 0, 0.3)' }} />
               </IconButton>
+
             )}
+
           </div>
+
         )}
+
         onChange={handleDateChange}
       />
+
     </LocalizationProvider>
   );
 }
 
-export default function Datepicker({ value, setValue, value2, setValue2, showdate, setShowdate }) {
+export default function Datepicker({
+  value,
+  setValue,
+  value2,
+  setValue2,
+  showdate,
+  setShowdate,
+  runtimeConfig
+}) {
+
   const [cleared, setCleared] = React.useState(false);
 
   const handleClear = () => {
-    setValue("01/01/1900");
-    // setValue2("2023-05-31");
-    setValue2("2026-02-28");
+
+    setValue(
+      dayjs(runtimeConfig?.defaultStartDate)
+    );
+
+    setValue2(
+      dayjs(runtimeConfig?.dataEndDate)
+    );
+
     setShowdate(false);
+
     setCleared(true);
   };
 
   return (
+
     <Stack spacing={3}>
+
       <DatePickerClear
         label="From"
         openTo="day"
         views={['year', 'month', 'day']}
         inputFormat="DD/MM/YYYY"
-        value={value}
+
+        value={value ? dayjs(value) : null}
+
+        referenceDate={value ? dayjs(value) : null}
+
+        minDate={dayjs(runtimeConfig?.defaultStartDate)}
+
+        maxDate={dayjs(runtimeConfig?.dataEndDate)}
+
         showdate={showdate}
+
         cleared={cleared}
+
         onChange={(newValue) => {
-          setValue(new Date(newValue));
+
+          setValue(newValue);
+
           setShowdate(false);
+
           setCleared(false);
+
         }}
+
         onClear={handleClear}
       />
+
       <DatePickerClear
         label="To"
+
         inputFormat="DD/MM/YYYY"
+
         openTo="day"
+
         views={['year', 'month', 'day']}
-        value={value2}
-        maxDate={new Date("2026-02-28")} 
+
+        value={value2 ? dayjs(value2) : null}
+      
+        referenceDate={value2 ? dayjs(value2) : null}
+
+        minDate={dayjs(runtimeConfig?.defaultStartDate)}
+
+        maxDate={dayjs(runtimeConfig?.dataEndDate)}
+
         showdate={showdate}
+
         cleared={cleared}
+
         onChange={(newValue) => {
-          setValue2(new Date(newValue));
+
+          setValue2(newValue);
+
           setShowdate(false);
-          setCleared(false); 
+
+          setCleared(false);
+
         }}
+
         onClear={handleClear}
       />
+
     </Stack>
   );
 }
-

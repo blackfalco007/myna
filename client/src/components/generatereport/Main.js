@@ -55,8 +55,7 @@ import "./style.css";
 import InstructionModal from "./InstructionModal";
 import { Link } from "react-router-dom";
 import { CloseOutlined } from "@mui/icons-material";
-import { district, statesList } from "./staticLists/staticLists";
-import { createTrack } from "./helpers/helperFunctions";
+import { createTrack, generateDefaultReportName } from "./helpers/helperFunctions";
 import dayjs from 'dayjs';
 import { getAreaOfPolygon } from 'geolib';
 import { open, openDbf, openShp, read } from 'shapefile';
@@ -121,8 +120,8 @@ function Main(props) {
   const [districtList, setDistrictList] = useState([]);
   const [localitiesList, setLocalitiesList] = useState([]);
   const [editedData, setEditedData] = useState(null);
-  const [value, setValue] = useState("1900-01-01");
-  const [value2, setValue2] = useState(dayjs('2026-02-28'));
+  const [value, setValue] = useState(null); //using state since its now in json
+  const [value2, setValue2] = useState(null); //using state since its now in json
   const [showdate, setShowdate] = useState(true);
   const [area, setArea] = useState(null)
   const [boundary, setBoundary] = useState(null);
@@ -134,6 +133,10 @@ function Main(props) {
   const { setStartPolygonDrawing } = useDrawing();
   const [bufferData, setBufferData] = useState(null);
   const [orgPolyCoords, setOrgPolyCoords] = useState(null);
+  //Below 3 are now pulled from json files (created at the time of dbRefresh - End-date and updated localities every month) 
+  const [statesList, setStatesList] = useState([]);
+  const [district, setDistrict] = useState([]);
+  const [runtimeConfig, setRuntimeConfig] = useState(null);
   
   const handleMouseLeave = () => {
     setAnchorEl(null);
@@ -220,7 +223,72 @@ function Main(props) {
   const formattedEndDate = formatDateToMMDDYYYY(value2);
 
   const handleSubmit = (event) => {
+
     event.preventDefault();
+
+    const finalReportName =
+      reportName?.trim() ||
+      generateDefaultReportName({
+        uploadedFileName,
+        selectedState,
+        selectedCounty,
+        selectedLocality,
+        newPolygon,
+        dateSuffix: dayjs().format("DDMMYY")
+      });
+
+    const fromDate = dayjs(value);
+
+    const toDate = dayjs(value2);
+
+    const minDate = dayjs(
+      runtimeConfig?.defaultStartDate || "1900-01-01"
+    );
+
+    const maxDate = dayjs(
+      runtimeConfig?.dataEndDate || "2026-03-31"
+    );
+
+    if (!fromDate.isValid()) {
+
+      toast.error("Please enter a valid From date");
+
+      return;
+    }
+
+    if (!toDate.isValid()) {
+
+      toast.error("Please enter a valid To date");
+
+      return;
+    }
+
+    if (fromDate.isBefore(minDate)) {
+
+      toast.error(
+        `From date cannot be before ${minDate.format("DD/MM/YYYY")}`
+      );
+
+      return;
+    }
+
+    if (toDate.isAfter(maxDate)) {
+
+      toast.error(
+        `To date cannot exceed ${maxDate.format("DD/MM/YYYY")}`
+      );
+
+      return;
+    }
+
+    if (toDate.isBefore(fromDate)) {
+
+      toast.error(
+        "To date cannot be before From date"
+      );
+
+      return;
+    }
     createTrack(mediumForReport)
     if (uploadedgeojson === null && selectedState === "" && !newPolygon) {
       toast.error(
@@ -234,14 +302,12 @@ function Main(props) {
         return;
       }
     }
-    if (!reportName || reportName.length > 35) {
-      if (reportName.length > 35) {
-        toast.error(
-          "Report Name Should be less than 35 characters including spaces"
-        );
-        return;
-      }
-      toast.error("Report Name is required to Generate the Report");
+    if (finalReportName.length > 35) {
+
+      toast.error(
+        "Report Name Should be less than 35 characters including spaces"
+      );
+
       return;
     }
     let formData = new FormData();
@@ -657,9 +723,76 @@ function Main(props) {
     }
   }, [districtJsonData]);
 
+  // Adding useEffect to load config JSON on component mount - date and localities list.
+  // Load geography + runtime config from ONE JSON
+  useEffect(() => {
 
-  
+    const loadConfig = async () => {
 
+      try {
+
+        const response = await fetch(
+          "/config/geographyHierarchy.json"
+        );
+
+        const data = await response.json();
+
+        // geography
+
+        setStatesList(data.statesList || []);
+
+        setDistrict(data.district || []);
+
+        // runtime config now comes from SAME file
+
+        setRuntimeConfig({
+          defaultStartDate: data.defaultStartDate,
+          dataEndDate: data.dataEndDate
+        });
+
+        // initialize dates
+
+        setValue(data.defaultStartDate);
+
+        setValue2(data.dataEndDate);
+
+      } catch (error) {
+
+        console.error(
+          "Error loading geographyHierarchy.json:",
+          error
+        );
+      }
+    };
+
+    loadConfig();
+
+  }, []);
+
+//Prefill name in edit box
+useEffect(() => {
+
+  // do not overwrite user-entered name
+
+  const generatedName =
+    generateDefaultReportName({
+      uploadedFileName,
+      selectedState,
+      selectedCounty,
+      selectedLocality,
+      newPolygon,
+      dateSuffix: dayjs().format("DDMMYY")
+    });
+
+  setReportName(generatedName);
+
+}, [
+  uploadedFileName,
+  selectedState,
+  selectedCounty,
+  selectedLocality,
+  newPolygon
+]);
 
 
   const drawer = (
@@ -926,6 +1059,7 @@ function Main(props) {
               setValue2={setValue2}
               showdate={showdate}
               setShowdate={setShowdate}
+              runtimeConfig={runtimeConfig}
             ></Datepicker>
             <FormControl>
               <TextField
