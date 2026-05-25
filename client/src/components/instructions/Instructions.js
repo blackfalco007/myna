@@ -13,6 +13,9 @@ import mynaDraw from "../../assets/images/mynaMapDrawOptions.png";
 import mynaPolygonDraw from "../../assets/images/mynaMapPolygonOption.png";
 import polygonDraw from "../../assets/images/drawUsingPolygon.png";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { APP_CONFIG } from "../../config/appConfig";
 
 const monthNames = [
   "Jan",
@@ -39,6 +42,30 @@ today.getFullYear();
 
 function Instructions() {
   localStorage.setItem("isUserNew", true);
+  const [runtimeConfig, setRuntimeConfig] =
+    useState(null);
+
+  useEffect(() => {
+
+    fetch("/config/geographyHierarchy.json")
+      .then((res) => res.json())
+      .then((data) => {
+
+        setRuntimeConfig({
+          dataEndDate: data.dataEndDate,
+          defaultStartDate: data.defaultStartDate
+        });
+
+      })
+      .catch((err) => {
+        console.error(
+          "Error loading geographyHierarchy.json",
+          err
+        );
+      });
+
+  }, []);
+
   const features = [
     {
       name: "Upload Map File",
@@ -182,16 +209,16 @@ function Instructions() {
                 <p className="leading-6">
                   This data is based entirely on eBird data that was downloaded
                   from{" "}
-                  <a href="https://www.ebird.org/india" target="_blank">www.ebird.org/india</a>,
-                  and includes public observations up till 28 February 2026. Data on
+                  <a href="https://www.ebird.org/india" target="_blank" rel="noreferrer">www.ebird.org/india</a>,
+                  and includes public observations up till {dayjs(runtimeConfig?.dataEndDate).format("DD MMM YYYY")}. Data on
                   sensitive species (
-                  <a href="https://ebird.org/india/news/ebird-sensitive-species" target="_blank">
+                  <a href="https://ebird.org/india/news/ebird-sensitive-species" target="_blank" rel="noreferrer">
                     https://ebird.org/india/news/ebird-sensitive-species
                   </a>
                   ) is not included in these summaries. All the different
                   classifications in this report follow the defined categories
                   of State of India’s Birds (SoIB) attribute table (
-                  <a href="https://stateofindiasbirds.in/#soib_report" target="_blank"  >
+                  <a href="https://stateofindiasbirds.in/#soib_report" target="_blank" rel="noreferrer">
                     See Table
                   </a>
                   ).
@@ -245,18 +272,18 @@ function Instructions() {
                 <p className="mt-3">
                   <span className="font-medium">Threatened</span>: Number of bird species that are listed as
                   threatened (Critically Endangered, Endangered, or Vulnerable)
-                  as per the global <a href="https://www.iucn.org/" target="_blank">IUCN assessments.</a>
+                  as per the global <a href="https://www.iucn.org/" target="_blank" rel="noreferrer">IUCN assessments.</a>
                 </p>
 
                 <p className="mt-3">
                   <span className="font-medium">High Priority</span>: Number of bird species that are listed
-                  as High Conservation Priority in the <a href="https://www.stateofindiasbirds.in/" target="_blank">State of India's Birds
-                    2026.</a>
+                  as High Conservation Priority in the <a href="https://www.stateofindiasbirds.in/" target="_blank" rel="noreferrer">State of India's Birds
+                    2023.</a>
                 </p>
 
                 <p className="mt-3">
                   <span className="font-medium">Schedule I</span>: Number of bird species that are listed in
-                  Schedule 1 of the <a href="https://prsindia.org/files/bills_acts/acts_parliament/2022/The%20Wild%20Life%20(Protection)%20Amendment%20Act,%202022.pdf" target="_blank">Wild Life (Protection) Amendment Act,
+                  Schedule 1 of the <a href="https://prsindia.org/files/bills_acts/acts_parliament/2022/The%20Wild%20Life%20(Protection)%20Amendment%20Act,%202022.pdf" target="_blank" rel="noreferrer">Wild Life (Protection) Amendment Act,
                     2022(WLPA).</a>
                 </p>
 
@@ -266,12 +293,12 @@ function Instructions() {
                 </p>
                 <p className="mt-3">
                   <ul className="list-disc">
-                    The following table summaries also follow the <a href="https://stateofindiasbirds.in/#soib_report" target="_blank" >SoIB attribute
+                    The following table summaries also follow the <a href="https://stateofindiasbirds.in/#soib_report" target="_blank" rel="noreferrer">SoIB attribute
                       table.</a>
-                    <li><a href="https://www.stateofindiasbirds.in/" target="_blank">SoIB Conservation Priority Species</a></li>
-                    <li><a href="https://cites.org/eng/app/index.php" target="_blank">CITES Appendix Species</a></li>
-                    <li><a href="https://www.cms.int/en/species/appendix-i-ii-cms" target="_blank">CMS Appendix Species</a></li>
-                    <li><a href="https://www.iucn.org/" target="_blank">IUCN Red List</a></li>
+                    <li><a href="https://www.stateofindiasbirds.in/" target="_blank" rel="noreferrer">SoIB Conservation Priority Species</a></li>
+                    <li><a href="https://cites.org/eng/app/index.php" target="_blank" rel="noreferrer">CITES Appendix Species</a></li>
+                    <li><a href="https://www.cms.int/en/species/appendix-i-ii-cms" target="_blank" rel="noreferrer">CMS Appendix Species</a></li>
+                    <li><a href="https://www.iucn.org/" target="_blank" rel="noreferrer">IUCN Red List</a></li>
                   </ul>
                   <p>
                     The remaining tables may not be displayed for every region.
@@ -281,7 +308,7 @@ function Instructions() {
                   <p>
                     <span className="font-medium">SOIB HIGH PRIORITY SPECIES, IUCN RED LIST SPECIES & ENDEMIC SPECIES</span> tables also include year of latest report and frequency of reporting (i.e., how often a species is reported measured by the percentage of complete checklists reporting this species)
                      apart from the values directly
-                    obtained from <a href="https://stateofindiasbirds.in/#soib_report" target="_blank">SoIB data table.</a>
+                    obtained from <a href="https://stateofindiasbirds.in/#soib_report" target="_blank" rel="noreferrer">SoIB data table.</a>
                   </p>
 
                   <p className="mt-3">
@@ -345,7 +372,7 @@ function Instructions() {
         className="grid grid-cols-3 text-center text-gray-100 p-3  font-sans bg-[#9A7269] fixed bottom-0 w-100"
       >
         <div className="col-span-2 text-right me-4 gandhi-family">
-          Generated from myna.stateofindiasbirds.in v.2.2 on {formattedDate}
+          Generated from myna.stateofindiasbirds.in {APP_CONFIG.VERSION} on {formattedDate}
         </div>
         <div
           className={` font-medium gandhi-family text-right`}
@@ -354,7 +381,7 @@ function Instructions() {
           <a
             style={{ textDecoration: "none" }}
             className="text-[#dbb931]"
-            target="_blank"
+            target="_blank" rel="noreferrer"
             href="https://www.alphanzo.io"
           >
             Alphanzo Technology Pvt Ltd

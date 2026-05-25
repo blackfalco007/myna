@@ -35,6 +35,7 @@ import { calculateCentroid, calculateZoom, createTrackMiddlewareForPdfGenerate }
 import CustomHeatMap from '../HeatMap';
 import Chart from "./BarChart";
 import * as turf from '@turf/turf';
+import { APP_CONFIG } from "../../config/appConfig";
 
 // import { position } from "html2canvas/dist/types/css/property-descriptors/position";
 function Report(props) {
@@ -1653,7 +1654,7 @@ function Report(props) {
           }`}
       >
         <div className="col-span-2 md:text-right lg:text-right xlg:text-right lmd:me-4 gandhi-family">
-          Generated from myna.stateofindiasbirds.in v.2.2 on {formattedDate}
+          Generated from myna.stateofindiasbirds.in {APP_CONFIG.VERSION} on {formattedDate}
         </div>
         <div
           className={`${changeLayoutForReport && "invisible"
