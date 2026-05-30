@@ -1,31 +1,29 @@
-const fs = require('fs');
-const path = require('path');
+const {
+  stateLookup,
+} = require('../cache/geographyCache');
 
-// Function to read the states.json and fetch data for a particular location
 const getLocationData = (locationName) => {
-    const statesFilePath = path.join(__dirname, '..', 'files', 'states.json');
-        // const statesFilePath = path.join(__dirname, '..', 'files', 'outputHimachalCordinates.json');
+  if (!locationName) {
+    console.error('No state name provided');
+    return null;
+  }
 
-    const statesData = JSON.parse(fs.readFileSync(statesFilePath, 'utf-8'));
+  const normalizedName = locationName
+    .trim()
+    .toLowerCase();
 
-    if (!locationName) {
-      console.error('No location name provided');
-      return;
-    }
+  const stateData =
+    stateLookup[normalizedName];
 
-    // Find the state by matching location name, using STATE_NAME property
-    const statesJsonData = statesData.features.find(item => {
-        return item.properties && item.properties.STATE_NAME &&
-               item.properties.STATE_NAME.trim().toLowerCase() === locationName.trim().toLowerCase();
-    });
+  if (!stateData) {
+    console.error(
+      `No state boundary found for: ${locationName}`
+    );
 
-    if (!statesJsonData) {
-      console.error(`No data found for location: ${locationName}`);
-    } else {
-      console.log('statesJsonData:', statesJsonData);
-    }
+    return null;
+  }
 
-    return statesJsonData;
+  return stateData;
 };
 
 module.exports = getLocationData;

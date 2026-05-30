@@ -131,6 +131,7 @@ function Main(props) {
   const [statesJsonData,setStatesJsonData] = useState({});
   const [districtJsonData,setDistrictJsonData] = useState({});
   const { setStartPolygonDrawing } = useDrawing();
+  const latestBoundaryRequest = useRef(0);
   const [bufferData, setBufferData] = useState(null);
   const [orgPolyCoords, setOrgPolyCoords] = useState(null);
   //Below 3 are now pulled from json files (created at the time of dbRefresh - End-date and updated localities every month) 
@@ -634,23 +635,50 @@ function Main(props) {
 
   useEffect(() => {
     const getData = async () => {
+
+      const requestId =
+        ++latestBoundaryRequest.current;
+
       try {
-        const response =  await api.get('users/geojson/districts', {
-          params: {
-            county: selectedCounty,
-            state: selectedState
+
+        const response = await api.get(
+          'users/geojson/districts',
+          {
+            params: {
+              county: selectedCounty,
+              state: selectedState
+            }
           }
-        });
-        // console.log(response.data);
+        );
+
+        // Ignore stale async responses
+        if (
+          requestId !==
+          latestBoundaryRequest.current
+        ) {
+          console.log(
+            'Ignoring stale district boundary response'
+          );
+
+          return;
+        }
+
         setDistrictJsonData(response.data);
+
       } catch (error) {
-        console.error('Error fetching data:', error);
+
+        console.error(
+          'Error fetching district data:',
+          error
+        );
       }
     };
+
     if (selectedCounty) {
       getData();
     }
-  }, [selectedCounty]);
+
+  }, [selectedCounty, selectedState]);
 
 //  console.log('statesJsonData',statesJsonData)
 
