@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 require('dotenv').config({
   path: path.join(__dirname, '../server/.env')
 });
@@ -39,12 +40,16 @@ const QUERY = `
 SELECT DISTINCT
     TRIM(l."STATE")    AS state,
     TRIM(l."COUNTY")   AS district,
-    TRIM(l."LOCALITY") AS locality
+    TRIM(l."LOCALITY") AS locality,
+    l."LATITUDE"       AS latitude,
+    l."LONGITUDE"      AS longitude
 FROM "LOCATION" l
 WHERE l."LOCALITY.TYPE" = 'H'
   AND l."STATE" IS NOT NULL
   AND l."COUNTY" IS NOT NULL
   AND l."LOCALITY" IS NOT NULL
+  AND l."LATITUDE" IS NOT NULL
+  AND l."LONGITUDE" IS NOT NULL
   AND TRIM(l."STATE") <> ''
   AND TRIM(l."COUNTY") <> ''
   AND TRIM(l."LOCALITY") <> ''
@@ -84,20 +89,32 @@ async function main() {
 
   /* ---------- hierarchy ---------- */
 
-  result.rows.forEach(({ state, district, locality }) => {
+  result.rows.forEach(({
+    state,
+    district,
+    locality,
+    latitude,
+    longitude
+  }) => {
 
     const s = clean(state);
     const d = clean(district);
     const l = clean(locality);
 
     if (!data[s]) data[s] = {};
-    if (!data[s][d]) data[s][d] = new Set();
 
-    data[s][d].add(l);
+    if (!data[s][d]) {
+      data[s][d] = [];
+    }
+
+    data[s][d].push({
+      name: l,
+      lat: Number(latitude),
+      lon: Number(longitude)
+    });
 
     allLocalities.add(l);
   });
-
   /* ---------- states ---------- */
 
   const statesList = Object.keys(data).sort();
@@ -112,7 +129,9 @@ async function main() {
       state,
       districts: districts.map((d) => ({
         district: d,
-        localities: Array.from(data[state][d]).sort()
+        localities: data[state][d].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
       }))
     };
   });

@@ -111,6 +111,7 @@ function Main(props) {
   const [selectedState, setSelectedState] = useState("");
   const [selectedCounty, setSelectedCounty] = useState("");
   const [selectedLocality, setSelectedLocality] = useState("");
+  const [selectedLocalityCoords, setSelectedLocalityCoords] = useState(null);
   const [showGeographySign, setShowGeographySign] = useState(false);
   const [showUploadFileComponent, setShowUploadFileComponent] = useState(false);
   const [newPolygon, setNewPolygon] = useState(null);
@@ -178,9 +179,23 @@ function Main(props) {
   };
 
   const handleLocalitySelect = (e) => {
-    setMediumForReport("localityR")
+
+    setMediumForReport("localityR");
+
+    const localityObj = localitiesList.find(
+      item => item.name === e.target.value
+    );
+
+    console.log("Selected locality:", localityObj);
+    setSelectedLocalityCoords({
+      lat: localityObj.lat,
+      lon: localityObj.lon
+    });
+
     setSelectedLocality(e.target.value);
+
   };
+
   const sortAlphabetically = (array, origin) => {
     try {
       if (origin === "district") {
@@ -926,13 +941,18 @@ useEffect(() => {
                     value={selectedLocality}
                   >
                     {localitiesList?.length > 0
-                      ? sortAlphabetically(localitiesList).map((item, i) => {
-                        return (
-                          <MenuItem key={i} value={item}>
-                            {item}
-                          </MenuItem>
-                        );
-                      })
+                      ? sortAlphabetically(localitiesList, "name").map(
+                          (item, i) => {
+                            return (
+                              <MenuItem
+                                key={i}
+                                value={item.name}
+                              >
+                                {item.name}
+                              </MenuItem>
+                            );
+                          }
+                        )
                       : ""}
                   </Select>
                 </FormControl>
