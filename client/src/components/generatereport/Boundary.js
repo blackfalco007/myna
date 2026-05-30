@@ -46,13 +46,16 @@ function Boundary(props) {
     // console.log("props.isStateData",props.isStateData)
     const blueStyle = props.isStateData
   ? {
-      color: '#00000000', 
+      color: '#3388ff', 
       weight: 2, 
       opacity: 1.0,
+      fillOpacity: 0.05
     }
   : {
+      color: '#3388ff', 
       weight: 2, 
       opacity: 1.0,
+      fillOpacity: 0.15
     };
     return (
       <GeoJSON
