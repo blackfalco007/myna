@@ -1,5 +1,7 @@
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config({
+  path: path.join(__dirname, '../server/.env')
+});
 const { Client } = require('pg');
 
 /* =========================================================
