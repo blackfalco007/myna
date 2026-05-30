@@ -28,9 +28,9 @@ const stateGeoJson = JSON.parse(
 console.log('Building district lookup maps...');
 
 const districtLookup = {};
-const districtCountyLookup = {};
 
 for (const feature of districtGeoJson.features) {
+
   const districtName = feature.properties?.DISTRIC
     ?.trim()
     .toLowerCase();
@@ -39,12 +39,20 @@ for (const feature of districtGeoJson.features) {
     ?.trim()
     .toLowerCase();
 
-  if (districtName) {
-    districtLookup[districtName] = feature;
-  }
+  const stateName =
+    feature.properties?.STATE
+      ?.trim()
+      .toLowerCase();
 
-  if (countyName) {
-    districtCountyLookup[countyName] = feature;
+  const district =
+    districtName || countyName;
+
+  if (district && stateName) {
+
+    const key =
+      `${stateName}|${district}`;
+
+    districtLookup[key] = feature;
   }
 }
 
@@ -64,7 +72,6 @@ for (const feature of stateGeoJson.features) {
 
 module.exports = {
   districtLookup,
-  districtCountyLookup,
   stateLookup,
   districtGeoJson,
   stateGeoJson,

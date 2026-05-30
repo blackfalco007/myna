@@ -11,7 +11,7 @@
   const cacheKeyGenerator = (req) => {
     const { state, county,locality, start, end } = req.query;
     const pathname = req.originalUrl.split('?')[0]; 
-    if(state & county & locality){
+    if(state && county && locality){
       return `${encodeURIComponent(state)}:${encodeURIComponent(county)}:${encodeURIComponent(locality)}:${encodeURIComponent(pathname)}:${start}:${end}`;
     }
     else if(state && county){
@@ -55,13 +55,20 @@
 
   });
 
-  router.get('/geojson/districts', 
-    cacheMiddleware(geoJSONCacheKeyGeneratorDistrict, oneYearInSeconds), 
+  router.get('/geojson/districts',
+  cacheMiddleware(geoJSONCacheKeyGeneratorDistrict, oneYearInSeconds),
   async (req, res) => {
-    const county = req.query.county;
 
-    try {
-      const districtData = getDistrictLocationData(county);
+  const county = req.query.county;
+  const state = req.query.state;
+
+  try {
+
+    const districtData =
+      getDistrictLocationData(
+        county,
+        state
+      );
 
       if (!districtData) {
         return res.status(404).send({ message: 'District data not found' });

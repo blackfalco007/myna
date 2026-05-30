@@ -1,29 +1,42 @@
 const {
   districtLookup,
-  districtCountyLookup,
 } = require('../cache/geographyCache');
 
-const getDistrictLocationData = (locationName) => {
+const getDistrictLocationData = (
+  locationName,
+  stateName
+) => {
+
   if (!locationName) {
     console.error('No district name provided');
     return null;
   }
 
-  const normalizedName = locationName
-    .trim()
-    .toLowerCase();
-
-  let districtJsonData =
-    districtLookup[normalizedName];
-
-  if (!districtJsonData) {
-    districtJsonData =
-      districtCountyLookup[normalizedName];
+  if (!stateName) {
+    console.error('No state name provided');
+    return null;
   }
 
+  const normalizedDistrict =
+    locationName
+      .trim()
+      .toLowerCase();
+
+  const normalizedState =
+    stateName
+      .trim()
+      .toLowerCase();
+
+  const cacheKey =
+    `${normalizedState}|${normalizedDistrict}`;
+
+  const districtJsonData =
+    districtLookup[cacheKey];
+
   if (!districtJsonData) {
+
     console.error(
-      `No district boundary found for: ${locationName}`
+      `No district boundary found for: ${stateName} -> ${locationName}`
     );
 
     return null;
