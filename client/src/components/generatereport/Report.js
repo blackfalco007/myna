@@ -35,7 +35,9 @@ import { calculateCentroid, calculateZoom, createTrackMiddlewareForPdfGenerate }
 import CustomHeatMap from '../HeatMap';
 import Chart from "./BarChart";
 import * as turf from '@turf/turf';
+import { generateReportId, generateApaCitation, generateBibtex } from "../../utils/reportCitation";
 import { APP_CONFIG } from "../../config/appConfig";
+
 
 // import { position } from "html2canvas/dist/types/css/property-descriptors/position";
 function Report(props) {
@@ -89,6 +91,48 @@ function Report(props) {
     "Nov",
     "Dec",
   ];
+
+  const dataEndDate =
+  localStorage.getItem("dataEndDate") || endDate;
+
+  const reportId =
+    generateReportId({
+      selectedState,
+      selectedCounty,
+      startDate,
+      endDate,
+      dataEndDate 
+    });
+
+  const apaCitation =
+    generateApaCitation({
+      selectedState,
+      selectedCounty,
+      startDate,
+      endDate
+    });
+
+  const bibtexCitation =
+    generateBibtex({
+      reportId,
+      selectedState,
+      selectedCounty,
+      startDate,
+      endDate,
+      dataEndDate
+    });
+  const generatedTimestamp =
+      new Date().toLocaleString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+const footerText =
+  `Generated using MYNA v${APP_CONFIG.VERSION} | ${reportId} | ${generatedTimestamp}`;
+
 
   const [pdfDownloadStatus, setPdfDownloadStatus] = useState("Download Pdf");
   const [changeLayoutForReport, setChangeLayoutForReport] = useState(false);
@@ -147,6 +191,7 @@ function Report(props) {
   const footer = useRef();
   const chartRef = useRef();
   const heatmapRef = useRef();
+  const citationMetadataRef = useRef();
 
   const closeHandler = () => {
     if (!selectedState && editedData) {
@@ -431,6 +476,7 @@ function Report(props) {
           chartRef,
           mostCommonSpeciesDiv,
           seasonalChartDiv,
+          citationMetadataRef,
           header,
           footer,
           getDataForIucnRedListTable,
@@ -1180,6 +1226,7 @@ function Report(props) {
                 />
               </div>
             </div>
+
             <div ref={seasonalChartDiv} className="p-1 lg:px-8 mt-12 text-xs lg:text-base">
               {getSeasonalChartData && getSeasonalChartData.length > 0 && (
                 <div className="text-center xsm:text-2xl sm:text-2xl md:text-4xl lg:text-4xl xlg:text-6xl gandhi-family-bold my-0 md:my-10 p-4 flex justify-center">
@@ -1459,162 +1506,8 @@ function Report(props) {
               <Chart mapZoomOut={mapZoomOut}/>
             </div>
 
-
-
-            {/* <div className=" grid grid-cols-3 px-20 ">
-              <div className="col-span-2">
-                <Card className="h-[70vh] w-[88vw] mt-32">
-                  <Map
-                    ref={mapRef}
-                    className=" w-full"
-                    style={{
-                      height: "58vh",
-                      width: window.innerWidth < 768 ? "100vw" : "58vw",
-                    }}
-                    google={props.google}
-                    mapTypeControl={false}
-                    scaleControl={false}
-                    streetViewControl={false}
-                    panControl={false}
-                    rotateControl={false}
-
-                    zoom={changeLayoutForReport ? 8.2 : 9}
-                    initialCenter={(convertedData && getPolygonCenter(convertedData, props.google)) || (editedData && getPolygonCenter(editedData, props.google)) || boundaryData && (changeLayoutForReport ? getPolygonCenter(boundaryData, props.google) : getPolygonCenter(boundaryData, props.google)) || formattedData && (changeLayoutForReport ? getPolygonCenter(formattedData, props.google) : getPolygonCenter(formattedData, props.google)) || { lat: 25.21, lng: 79.32 }}
-                  >
-                    {props.data && props.data.features && props.data.features.length > 0 && (
-                      <Polygon
-                        paths={[props.data.features[0].geometry.coordinates[0]]}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-                      />
-                    )}
-
-                    {editedData && (
-                      <Polygon
-                        paths={editedData}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-                      />
-                    )}
-
-                    {convertedData && (
-                      <Polygon
-                        paths={convertedData}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-                      />
-                    )}
-
-                    {boundaryData && (
-                      <Polygon
-                        paths={boundaryData}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-                      />
-                    )}
-                    {formattedData && (
-                      <Polygon
-                        paths={formattedData}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-                      />
-                    )}
-                    {(capturedMarkers?.length > 0 ? capturedMarkers : getHotspotAreas).map((marker) => (
-                      <Marker
-                        key={marker.id}
-                        position={marker.position}
-                        onMouseover={marker.onMouseover}
-                      />
-                    ))}
-
-                    {getHotspotAreas && getHotspotAreas?.map(marker => (
-                      <Marker
-                        key={marker.localityId}
-                        position={{ lat: marker.latitude, lng: marker.longitude }}
-                        onMouseover={() => handleMarkerClick(marker)}
-                        onMouseout={() => setShowInfoWindow(false)}
-                      />
-                    ))}
-
-                    {getHotspotAreas && activeMarker && getHotspotAreas?.map(marker => (
-                      <InfoWindow
-                        key={marker.localityId}
-                        position={{ lat: activeMarker.latitude, lng: marker.longitude }}
-                        visible={showInfoWindow && activeMarker === marker}
-                        zIndex={10000}
-                      >
-                        <div style={{ zIndex: '1000' }}>
-                          <p>{marker.locality}</p>
-                        </div>
-                      </InfoWindow>
-                    ))}
-                  </Map>
-                  {area != null ? (
-                    <span className={`bg-[#F3EDE8] text-gray-800 h-[64vh] p-2 pb-4 gandhi-family rounded-b-xl`}
-                      style={{ display: 'flex', alignItems: 'end', letterSpacing: '0.05em', fontFamily: '"Gandhi Sans Regular"' }}>
-                      {" "}
-                      {"Area: "}{parseFloat(roundToTwoDecimals(area))} square kilometers
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                </div>
-                <div className="ml-2 ">
-                  {" "}
-                  <TableCard tabledata={getHotspotAreas} />
-                </div>
-              </div>
-            </div>
-
-            {/* <div style={{height:'80vh'}}> */}
-            {/* <div
-              ref={heatmapRef}
-              className="mt-[27rem] md:mt-0 lg:mt-0 flex justify-center items-center relative"
-            >
-              <CustomHeatMap
-                className="md:absolute lg:absolute"
-                paths={editedData || convertedData || formattedData || boundaryData || []}
-                setPolygonsCount={setPolygonsCount} 
-              />
-
-              <div className="absolute bottom-0 left-0 w-full flex justify-center items-center bg-white  py-2 translate-y-[48px]">
-                <div className="flex items-center mx-2">
-                  <div className="w-8 h-8 bg-[#562377] border border-black mr-2"></div>
-                  <span className="text-sm">{'>= 70'}</span>
-                </div>
-                <div className="flex items-center mx-2">
-                  <div className="w-8 h-8 bg-[#3949ab] border border-black mr-2"></div>
-                  <span className="text-sm">{'30 - 69'}</span>
-                </div>
-                <div className="flex items-center mx-2">
-                  <div className="w-8 h-8 bg-[#5c6bc0] border border-black mr-2"></div>
-                  <span className="text-sm">{'10 - 29'}</span>
-                </div>
-                <div className="flex items-center mx-2">
-                  <div className="w-8 h-8 bg-[#7986cb] border border-black mr-2"></div>
-                  <span className="text-sm">{'2 - 9'}</span>
-                </div>
-                <div className="flex items-center mx-2">
-                  <div className="w-8 h-8 bg-[#c5cae9] border border-black mr-2"></div>
-                  <span className="text-sm">{'< 2'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div ref={chartRef} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', transform: 'translateY(48px)', marginTop: '6rem', marginBottom: '6rem' }}>
-              <Chart />
-            </div> */}
-
+            {}
+            {}
 
             <div className="p-1 lg:px-8 mt-8 text-xs lg:text-base mb-4">
               <Card className="md:mx-5 lg:mx-40">
@@ -1635,7 +1528,126 @@ function Report(props) {
                 </div>
               </Card>
             </div>
+
+<div className="p-1 lg:px-8 mt-10 text-xs lg:text-base lg:max-w-5xl mx-auto mb-16">
+
+  <Card className="p-6 shadow-md rounded-xl">
+
+    <div ref={citationMetadataRef}>
+
+      <div className="text-center mb-6">
+
+        <div className="text-2xl md:text-4xl gandhi-family-bold">
+          CITATION & REPORT METADATA
+        </div>
+
+        <div className="w-24 h-1 bg-[#DAB830] mx-auto mt-4 rounded"></div>
+
+      </div>
+
+      {/* Suggested Citation */}
+
+      <div className="mb-8">
+
+        <div className="text-lg md:text-2xl gandhi-family-bold text-[#9A7269] mb-3">
+          Suggested Citation
+        </div>
+
+        <div className="bg-[#F8F6F4] border border-gray-200 rounded-lg p-3 leading-7 text-sm md:text-base text-gray-800">
+
+          {apaCitation}
+
+        </div>
+
+      </div>
+
+      {/* Metadata Cards */}
+
+      <div className="mb-8">
+
+        <div className="text-lg md:text-2xl gandhi-family-bold text-[#9A7269] mb-4">
+          Report Metadata
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div className="bg-[#F8F6F4] border border-gray-200 rounded-lg p-4">
+
+            <div className="font-bold text-gray-700 mb-2">
+              Report ID
+            </div>
+
+            <div className="break-all text-sm text-gray-800">
+              {reportId}
+            </div>
+
           </div>
+
+          <div className="bg-[#F8F6F4] border border-gray-200 rounded-lg p-4">
+
+            <div className="font-bold text-gray-700 mb-2">
+              Dataset Version
+            </div>
+
+            <div className="text-sm text-gray-800">
+              eBird data till {dataEndDate}
+            </div>
+
+          </div>
+
+          <div className="bg-[#F8F6F4] border border-gray-200 rounded-lg p-4">
+
+            <div className="font-bold text-gray-700 mb-2">
+              MYNA Version
+            </div>
+
+            <div className="text-sm text-gray-800">
+              v{APP_CONFIG.VERSION}
+            </div>
+
+          </div>
+
+          <div className="bg-[#F8F6F4] border border-gray-200 rounded-lg p-4">
+
+            <div className="font-bold text-gray-700 mb-2">
+              Generated On
+            </div>
+
+            <div className="text-sm text-gray-800">
+              {generatedTimestamp}
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    {/* BibTeX */}
+
+    <div>
+
+      <div className="text-lg md:text-2xl gandhi-family-bold text-[#9A7269] mb-3">
+        BibTeX
+      </div>
+
+      <div className="bg-[#1E1E1E] text-[#D4D4D4] rounded-lg p-4 overflow-x-auto">
+
+        <pre className="whitespace-pre-wrap text-xs md:text-sm leading-6 font-mono">
+
+          {bibtexCitation}
+
+        </pre>
+
+      </div>
+
+    </div>
+
+  </Card>
+
+</div>          </div>
         ) : (
           <ReoprtSkeleton />
         )}
@@ -1668,8 +1680,8 @@ function Report(props) {
         className={`lmd:grid  grid-cols-3  text-center text-gray-100 p-3 break-normal font-sans bg-[#9A7269] ${changeLayoutForReport && "pb-5"
           }`}
       >
-        <div className="col-span-2 md:text-right lg:text-right xlg:text-right lmd:me-4 gandhi-family">
-          Generated from myna.stateofindiasbirds.in {APP_CONFIG.VERSION} on {formattedDate}
+        <div className="col-span-2 text-left px-6 md:px-10 lg:px-14 gandhi-family break-all">
+          {footerText}
         </div>
         <div
           className={`${changeLayoutForReport && "invisible"
