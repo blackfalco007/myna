@@ -153,11 +153,14 @@ function Main(props) {
   const [showreport, setShowreport] = useState(false);
 
   const handleSelectState = (e) => {
+
+    setSelectedLocality("");
+    setSelectedLocalityCoords(null);
+    
     setBoundary(null)
     setSelectedState(e.target.value);
     setSelectedCounty("");
 
-    setSelectedLocality("");
     const filteredState = district.find(
       (item) => item.state === e.target.value
     );
@@ -168,6 +171,10 @@ function Main(props) {
   // console.log('selectedState',selectedState)
 
   const handleSelectCounty = (e) => {
+
+    setSelectedLocality("");
+    setSelectedLocalityCoords(null);
+
     setBoundary(null)
     setMediumForReport("districtR")
     const district = districtList.find(
@@ -191,6 +198,8 @@ function Main(props) {
       lat: localityObj.lat,
       lon: localityObj.lon
     });
+
+    setBoundary(null); //No boundary needed when locality is selected since we will be using locality coordinates for data fetching
 
     setSelectedLocality(e.target.value);
 
@@ -510,7 +519,11 @@ function Main(props) {
       setMediumForReport("zipR")
       setEditedData(null)
       setShowGeographySign(false);
+      setSelectedLocality("");
+      
+      setSelectedLocalityCoords(null);
       setUploadedgeojson(null);
+      
       const reader = new FileReader();
       const file = e.target.files[0];
       const compactFileName = generateFileName(file?.name);
@@ -546,6 +559,10 @@ function Main(props) {
     setShowGeographySign(false);
     handleMouseLeave();
     setUploadedgeojson(null);
+    
+    setSelectedLocality("");
+    setSelectedLocalityCoords(null);
+
     const file = e.target.files[0];
     const compactFileName = generateFileName(file?.name);
     if (file?.name.slice(-3) === "kml") {
@@ -581,6 +598,7 @@ function Main(props) {
       setSelectedState("");
       setSelectedCounty("");
       setSelectedLocality("");
+      setSelectedLocalityCoords(null);
     }
     if (emitter === "Geography Button") {
       setShowUploadFileComponent(false);
@@ -974,6 +992,7 @@ useEffect(() => {
                       setSelectedState("");
                       setSelectedCounty("");
                       setSelectedLocality("");
+                      setSelectedLocalityCoords(null);
                     }
 
                     if (newPolygon) {
@@ -1286,6 +1305,7 @@ useEffect(() => {
           setSelectedCounty={setSelectedCounty}
           selectedLocality={selectedLocality}
           setSelectedLocality={setSelectedLocality}
+          selectedLocalityCoords={selectedLocalityCoords}
           data={Finaldata}
           setShowGeographySign={setShowGeographySign}
           dataForMap={uploadedgeojson}
@@ -1394,6 +1414,7 @@ useEffect(() => {
               selectedState={selectedState}
               selectedCounty={selectedCounty}
               selectedLocality={selectedLocality}
+              selectedLocalityCoords={selectedLocalityCoords}
               newPolygon={newPolygon}
               setNewPolygon={setNewPolygon}
               setGeoJson={setGeoJson}

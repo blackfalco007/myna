@@ -1,344 +1,3 @@
-// //old code
-
-
-// import React, { useState } from "react";
-// import { MapContainer } from "react-leaflet";
-// import "leaflet/dist/leaflet.css";
-// import Ziptogeojson from "./Ziptogeojson";
-// //import { EditControl } from "react-leaflet-draw";
-// import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-// import { IconButton, Menu, MenuItem } from "@mui/material";
-// import { AiOutlineFileText } from "react-icons/ai";
-// import kmlFileIcon from "../../../src/assets/images/kml.png";
-// import { VscJson } from "react-icons/vsc";
-// import geojsonToKml from "geojson-to-kml";
-// // import shpwrite from "shp-write";
-// import shpwrite from '@mapbox/shp-write';
-
-// import ReactLeafletGoogleLayer from "react-leaflet-google-layer";
-// import { formattedDate } from "./helpers/generateReportTableData";
-// import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
-// import MyControls from "./MyControls";
-// import Boundary from "./Boundary";
-
-// function Reportmap(props) {
-//   const { editedData, setEditedData } = props;
-//   const [anchorEl, setAnchorEl] = useState(null);
-//   const _onCreate = (e) => {
-//     props.setMediumForReport("polygonR")
-//     const coordinates = e.layer._latlngs;
-//     const coordinatesForFile = [
-//       coordinates[0].map((point) => [point.lng, point.lat]),
-//     ];
-//     props.setShowGeographySign(false);
-//     props.setNewPolygon(e);
-//     setEditedData(coordinates[0]);
-//     const feature = {
-//       type: "Feature",
-//       properties: {},
-//       geometry: {
-//         type: "Polygon",
-//         coordinates: coordinatesForFile,
-//       },
-//     };
-//     const featureCollection = {
-//       type: "FeatureCollection",
-//       features: [feature],
-//     };
-//     const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//     const blob = new Blob([geoJSONString], { type: "application/json" });
-//     props.setGeoJson(blob);
-//   };
-//   const _onDeleted = (e) => {
-//     props.removeFile();
-//     props.setNewPolygon(null);
-//     props.setGeoJson(null);
-//   };
-//   // const _onEditPath = (e) => {};
-//   const open = Boolean(anchorEl);
-//   const handleClick = (event) => {
-//     setAnchorEl(event.currentTarget);
-//   };
-
-  
-
-//   const handleShapeFileDownload = async (e) => {
-//     let featureCollection;
-  
-//     if (editedData && editedData.length > 0) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-//       console.log('coordinates', coordinates);
-//       const feature = {
-//         type: "Feature",
-//         properties: {
-//           "fill-opacity": 0,
-//           stroke: "#ff0000",
-//           "stroke-opacity": 1,
-//         },
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-//       featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//     } else if (props.data) {
-//       featureCollection = props.data;
-//     } else {
-//       console.error("No valid data available for download.");
-//       return;
-//     }
-  
-//     const baseFilename = `${props.reportName}_myna_${formattedDate()}.zip`;
-//     const maxLength = 30;
-  
-//     const filename = baseFilename.length > maxLength
-//       ? `${baseFilename.substring(0, maxLength - 4)}.zip` 
-//       : baseFilename;
-  
-//     try {
-//       const zipOptions = {
-//         folder: 'shapes', 
-//         outputType: 'blob', 
-//         compression: 'DEFLATE',
-//         types: {
-//           point: 'points',
-//           polygon: 'polygons',
-//           polyline: 'lines',
-//         },
-//       };
-  
-//       const zipDataPromise = shpwrite.zip(featureCollection, zipOptions);
-  
-//       const zipData = await zipDataPromise;
-  
-//       const url = URL.createObjectURL(zipData);
-  
-//       const a = document.createElement('a');
-//       a.href = url;
-//       a.download = filename;
-//       document.body.appendChild(a);
-//       a.click();
-  
-//       document.body.removeChild(a);
-//       URL.revokeObjectURL(url);
-//     } catch (error) {
-//       console.error("Error during shapefile download:", error);
-//     }
-//   };
-
-//   const handleKmlDownload = (e) => {
-//     if (editedData) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-//       const feature = {
-//         type: "Feature",
-//         properties: {
-//           "fill-opacity": 0,
-//           stroke: "#ff0000",
-//           "stroke-opacity": 1,
-//         },
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-
-//       const featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//       const kml = geojsonToKml(featureCollection);
-//       const blob = new Blob([kml], {
-//         type: "application/octet-stream",
-//       });
-//       const url = window.URL.createObjectURL(blob);
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = url;
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".kml";
-//       downloadLink.click();
-//     } else {
-//       const kml = geojsonToKml(props.data);
-//       const blob = new Blob([kml], { type: "application/octet-stream" });
-//       const url = window.URL.createObjectURL(blob);
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = url;
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".kml";
-//       downloadLink.click();
-//     }
-//   };
-
-//   const handleGeoJSONDownload = (e) => {
-//     if (editedData) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-
-//       const feature = {
-//         type: "Feature",
-//         properties: {},
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-
-//       const featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//       const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//       const blob = new Blob([geoJSONString], { type: "application/json" });
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = URL.createObjectURL(blob);
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".geojson";
-//       downloadLink.click();
-//     } else {
-//       const geoJSONString = JSON.stringify(props.data, null, 2);
-//       const blob = new Blob([geoJSONString], { type: "application/json" });
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = URL.createObjectURL(blob);
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".geojson";
-//       downloadLink.click();
-//     }
-//   };
-
-//   const handleEdit = (event) => {
-//     setEditedData(event?.target?._latlngs[0]);
-//     const coordinatesForFile = [
-//       event?.target?._latlngs[0].map((point) => [point.lng, point.lat]),
-//     ];
-//     const feature = {
-//       type: "Feature",
-//       properties: {},
-//       geometry: {
-//         type: "Polygon",
-//         coordinates: coordinatesForFile,
-//       },
-//     };
-//     const featureCollection = {
-//       type: "FeatureCollection",
-//       features: [feature],
-//     };
-//     const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//     const blob = new Blob([geoJSONString], { type: "application/json" });
-//     props.setGeoJson(blob);
-//   };
-
-//   return (
-//     <div className="mt-14 md:mt-0  w-[100%]">
-//       <MapContainer
-//         className="h-[95vh] md:h-[100vh] relative w-[100%]"
-//         center={[25.21, 79.32]}
-//         zoom={4}
-//         scrollWheelZoom={true}
-//       // zoomControl={false}
-//       >
-
-        // <ReactLeafletGoogleLayer
-        //   googleMapsLoaderConf={{ region: "IN" }}
-        //   apiKey={process.env.REACT_APP_API_KEY}
-        // />
-//          <style jsx>{`
-//         .leaflet-control-attribution {
-//           display: none;
-//         }
-//       `}</style>
-
-
-//         {!props.selectedState && (
-//           <MyControls
-//             _onDeleted={_onDeleted}
-//             _onCreate={_onCreate}
-//             data={props.data}
-//             newPolygon={props.newPolygon}
-//             setArea={props.setArea}
-//             uploadedgeojson={props.uploadedgeojson}
-//           />
-//         )}
-
-//         {props?.data !== null && (
-//           <Ziptogeojson
-//             setData={props?.setData}
-//             toast={props.toast}
-//             data={props?.data}
-//             handleEdit={handleEdit}
-//             onReport={false}
-//             onDelete={_onDeleted}
-//             isZoomRequired={props.isZoomRequired}
-//             setIsZoomRequired={props.setIsZoomRequired}
-//             setArea={props.setArea}
-//           />
-//         )}
-//         {props.boundary &&
-//           <Boundary
-//             data={props.boundary}
-//             setData={props.setBoundary}
-//             isStateData={props.isStateData}
-//           />
-//         } 
-//       </MapContainer>
-//       <div className="download-div">
-//         <IconButton onClick={handleClick} id="account-menu">
-//           <FileDownloadOutlinedIcon
-//             fontSize="small"
-//             style={{ color: "#000" }}
-//           />
-//         </IconButton>
-//       </div>
-//       <Menu
-//         anchorEl={anchorEl}
-//         id="account-menu"
-//         open={open}
-//         onClose={() => setAnchorEl(null)}
-//         onClick={() => setAnchorEl(null)}
-//         transformOrigin={{ horizontal: "right", vertical: "top" }}
-//         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-//       >
-//         <MenuItem onClick={handleShapeFileDownload} sx={{ cursor: "pointer" }}>
-//           <AiOutlineFileText size="25" />
-//           <span style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in ShapeFile.zip</span>
-//         </MenuItem>
-//         <MenuItem onClick={handleKmlDownload} sx={{ cursor: "pointer" }}>
-//           {" "}
-//           <img
-//             className="me-1.5"
-//             src={kmlFileIcon}
-//             alt="img"
-//             height="20"
-//             width={20}
-//           />
-//           <span style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in .Kml</span>{" "}
-//         </MenuItem>
-//         <MenuItem onClick={handleGeoJSONDownload}>
-//           {" "}
-//           <VscJson size="25" />{" "}
-//           <span  style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in .geojson</span>{" "}
-//         </MenuItem>
-//       </Menu>
-//     </div>
-//   );
-// }
-
-// export default Reportmap;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //for scale
 
 import React, { useEffect, useState } from "react";
@@ -363,8 +22,40 @@ import Boundary from "./Boundary";
 import * as turf from '@turf/turf';
 import Slider from '@mui/material/Slider';
 import { TbRulerMeasure } from "react-icons/tb";
-import L from 'leaflet';
 import { useDrawing } from "./contexts/Mapcontext";
+import { Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import markerRed from "../../assets/images/marker-icon-red.png";
+import markerShadow from "../../assets/images/marker-shadow.png";
+
+const redIcon = new L.Icon({
+  iconUrl: markerRed,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+function LocalityFlyTo({ coords }) {
+
+  const map = useMap();
+
+  useEffect(() => {
+
+    if (coords) {
+
+      map.flyTo(
+        [coords.lat, coords.lon],
+        12
+      );
+
+    }
+
+  }, [coords, map]);
+
+  return null;
+}
 
 
 function Reportmap(props) {
@@ -382,6 +73,10 @@ function Reportmap(props) {
   const [polyEnd, setPolyEnd] = useState(false);
   function PolygonDrawer({ startPolygonDrawing, setStartPolygonDrawing,setPolyEnd }) {
     const map = useMap();
+    console.log(
+      "LOCALITY COORDS IN BOUNDARY",
+      props.selectedLocalityCoords
+    );
   
     useEffect(() => {
       if (startPolygonDrawing && map) {
@@ -856,14 +551,38 @@ useEffect(()=>{
             setArea={props.setArea}
           />
         )}
-        {props.boundary && 
+
+        {props.selectedLocalityCoords && (
+          <LocalityFlyTo
+            coords={props.selectedLocalityCoords}
+          />
+        )}
+
+        {props.boundary && !props.selectedLocalityCoords && 
           <Boundary
             data={props.boundary}
             setData={props.setBoundary}
             isStateData={props.isStateData}
             selectedState={props.selectedState}
+            selectedLocalityCoords={props.selectedLocalityCoords}
           />
         } 
+        {props.selectedLocalityCoords && (
+          <>
+        {console.log("RENDERING MARKER")}
+        <Marker
+          position={[
+            props.selectedLocalityCoords.lat,
+            props.selectedLocalityCoords.lon
+          ]}
+          icon={redIcon}
+        >
+          <Popup>
+            {props.selectedLocality}
+          </Popup>
+        </Marker>
+        </>          
+      )}
       </MapContainer>
       <div className="download-div">
         <IconButton onClick={handleClick} id="account-menu">
@@ -908,397 +627,3 @@ useEffect(()=>{
 }
 
 export default Reportmap;
-
-
-
-//for layers
-
-// import React, { useState,useEffect } from "react";
-// import { MapContainer,TileLayer, GeoJSON,useMap } from "react-leaflet";
-// import "leaflet/dist/leaflet.css";
-// import Ziptogeojson from "./Ziptogeojson";
-// //import { EditControl } from "react-leaflet-draw";
-// import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-// import { IconButton, Menu, MenuItem } from "@mui/material";
-// import { AiOutlineFileText } from "react-icons/ai";
-// import kmlFileIcon from "../../../src/assets/images/kml.png";
-// import { VscJson } from "react-icons/vsc";
-// import geojsonToKml from "geojson-to-kml";
-// // import shpwrite from "shp-write";
-// import shpwrite from '@mapbox/shp-write';
-
-// import ReactLeafletGoogleLayer from "react-leaflet-google-layer";
-// import { formattedDate } from "./helpers/generateReportTableData";
-// import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
-// import MyControls from "./MyControls";
-// import Boundary from "./Boundary";
-// import L from "leaflet";
-// import { useDrawing } from "./contexts/Mapcontext";
-
-// function Reportmap(props) {
-//   const { editedData, setEditedData } = props;
-//   const [anchorEl, setAnchorEl] = useState(null);
-//   const { startPolygonDrawing, setStartPolygonDrawing } = useDrawing();
-//   const [polyEnd, setPolyEnd] = useState(false);
-
-
-// // Separate component inside Reportmap
-// function PolygonDrawer({ startPolygonDrawing, setStartPolygonDrawing,setPolyEnd }) {
-//   const map = useMap();
-
-//   useEffect(() => {
-//     if (startPolygonDrawing && map) {
-//       map.pm.enableDraw("Polygon", {
-//         snappable: true,
-//         templineStyle: {
-//           color: "rgb(51, 136, 255)",
-//         },
-//       });
-
-//       map.on("pm:create", () => {
-//         setStartPolygonDrawing(false);
-//         setPolyEnd(true);
-//         map.pm.disableDraw();
-//       });
-//     }
-//   }, [startPolygonDrawing, map]);
-
-//   useEffect(() => {
-//     if (polyEnd) {
-//       const timer = setTimeout(() => {
-//         setPolyEnd(false);
-//       }, 5000);
-//       return () => clearTimeout(timer);
-//     }
-//   }, [polyEnd]);
-
-//   return null; 
-// }
-
-
-//   const _onCreate = (e) => {
-//     props.setMediumForReport("polygonR")
-//     const coordinates = e.layer._latlngs;
-//     const coordinatesForFile = [
-//       coordinates[0].map((point) => [point.lng, point.lat]),
-//     ];
-//     props.setShowGeographySign(false);
-//     props.setNewPolygon(e);
-//     setEditedData(coordinates[0]);
-//     const feature = {
-//       type: "Feature",
-//       properties: {},
-//       geometry: {
-//         type: "Polygon",
-//         coordinates: coordinatesForFile,
-//       },
-//     };
-//     const featureCollection = {
-//       type: "FeatureCollection",
-//       features: [feature],
-//     };
-//     const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//     const blob = new Blob([geoJSONString], { type: "application/json" });
-//     props.setGeoJson(blob);
-//   };
-//   const _onDeleted = (e) => {
-//     props.removeFile();
-//     props.setNewPolygon(null);
-//     props.setGeoJson(null);
-//   };
-//   // const _onEditPath = (e) => {};
-//   const open = Boolean(anchorEl);
-//   const handleClick = (event) => {
-//     setAnchorEl(event.currentTarget);
-//   };
-
-  
-
-//   const handleShapeFileDownload = async (e) => {
-//     let featureCollection;
-  
-//     if (editedData && editedData.length > 0) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-//       console.log('coordinates', coordinates);
-//       const feature = {
-//         type: "Feature",
-//         properties: {
-//           "fill-opacity": 0,
-//           stroke: "#ff0000",
-//           "stroke-opacity": 1,
-//         },
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-//       featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//     } else if (props.data) {
-//       featureCollection = props.data;
-//     } else {
-//       console.error("No valid data available for download.");
-//       return;
-//     }
-  
-//     const baseFilename = `${props.reportName}_myna_${formattedDate()}.zip`;
-//     const maxLength = 30;
-  
-//     const filename = baseFilename.length > maxLength
-//       ? `${baseFilename.substring(0, maxLength - 4)}.zip` 
-//       : baseFilename;
-  
-//     try {
-//       const zipOptions = {
-//         folder: 'shapes', 
-//         outputType: 'blob', 
-//         compression: 'DEFLATE',
-//         types: {
-//           point: 'points',
-//           polygon: 'polygons',
-//           polyline: 'lines',
-//         },
-//       };
-  
-//       const zipDataPromise = shpwrite.zip(featureCollection, zipOptions);
-  
-//       const zipData = await zipDataPromise;
-  
-//       const url = URL.createObjectURL(zipData);
-  
-//       const a = document.createElement('a');
-//       a.href = url;
-//       a.download = filename;
-//       document.body.appendChild(a);
-//       a.click();
-  
-//       document.body.removeChild(a);
-//       URL.revokeObjectURL(url);
-//     } catch (error) {
-//       console.error("Error during shapefile download:", error);
-//     }
-//   };
-
-//   const handleKmlDownload = (e) => {
-//     if (editedData) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-//       const feature = {
-//         type: "Feature",
-//         properties: {
-//           "fill-opacity": 0,
-//           stroke: "#ff0000",
-//           "stroke-opacity": 1,
-//         },
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-
-//       const featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//       const kml = geojsonToKml(featureCollection);
-//       const blob = new Blob([kml], {
-//         type: "application/octet-stream",
-//       });
-//       const url = window.URL.createObjectURL(blob);
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = url;
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".kml";
-//       downloadLink.click();
-//     } else {
-//       const kml = geojsonToKml(props.data);
-//       const blob = new Blob([kml], { type: "application/octet-stream" });
-//       const url = window.URL.createObjectURL(blob);
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = url;
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".kml";
-//       downloadLink.click();
-//     }
-//   };
-
-//   const handleGeoJSONDownload = (e) => {
-//     if (editedData) {
-//       const coordinates = [editedData.map((point) => [point.lng, point.lat])];
-
-//       const feature = {
-//         type: "Feature",
-//         properties: {},
-//         geometry: {
-//           type: "Polygon",
-//           coordinates: coordinates,
-//         },
-//       };
-
-//       const featureCollection = {
-//         type: "FeatureCollection",
-//         features: [feature],
-//       };
-//       const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//       const blob = new Blob([geoJSONString], { type: "application/json" });
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = URL.createObjectURL(blob);
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".geojson";
-//       downloadLink.click();
-//     } else {
-//       const geoJSONString = JSON.stringify(props.data, null, 2);
-//       const blob = new Blob([geoJSONString], { type: "application/json" });
-//       const downloadLink = document.createElement("a");
-//       downloadLink.href = URL.createObjectURL(blob);
-//       downloadLink.download =
-//         props.reportName + "_myna_" + formattedDate() + ".geojson";
-//       downloadLink.click();
-//     }
-//   };
-
-//   const handleEdit = (event) => {
-//     setEditedData(event?.target?._latlngs[0]);
-//     const coordinatesForFile = [
-//       event?.target?._latlngs[0].map((point) => [point.lng, point.lat]),
-//     ];
-//     const feature = {
-//       type: "Feature",
-//       properties: {},
-//       geometry: {
-//         type: "Polygon",
-//         coordinates: coordinatesForFile,
-//       },
-//     };
-//     const featureCollection = {
-//       type: "FeatureCollection",
-//       features: [feature],
-//     };
-//     const geoJSONString = JSON.stringify(featureCollection, null, 2);
-//     const blob = new Blob([geoJSONString], { type: "application/json" });
-//     props.setGeoJson(blob);
-//   };
- 
-
-  
-  
-  
-
-
-
-//   return (
-//     <div className="mt-14 md:mt-0  w-[100%] leaflet-container">
-//       <MapContainer
-//         className="h-[95vh] md:h-[100vh] relative w-[100%]"
-//         center={[25.21, 79.32]}
-//         zoom={4}
-//         scrollWheelZoom={true}
-//       // zoomControl={false}
-//       maxBounds={[
-//         [6, 68],  
-//         [37, 97],  
-//       ]}
-//       maxBoundsViscosity={1.0}
-//       >
-//           {/* <PaneCreator />  */}
-  
-//           <PolygonDrawer
-//     startPolygonDrawing={startPolygonDrawing}
-//     setStartPolygonDrawing={setStartPolygonDrawing}
-//     setPolyEnd={setPolyEnd}
-//   />
-      
-
-//         <ReactLeafletGoogleLayer
-//           googleMapsLoaderConf={{ region: "IN" }}
-//           apiKey={process.env.REACT_APP_API_KEY}
-//         />
-//          <style jsx>{`
-//         .leaflet-control-attribution {
-//           display: none;
-//         }
-          
-//       `}</style>
-
-
-//         {!props.selectedState && (
-//           <MyControls
-//             _onDeleted={_onDeleted}
-//             _onCreate={_onCreate}
-//             data={props.data}
-//             newPolygon={props.newPolygon}
-//             setArea={props.setArea}
-//             uploadedgeojson={props.uploadedgeojson}
-//           />
-//         )}
-
-//         {props?.data !== null && (
-//           <Ziptogeojson
-//             setData={props?.setData}
-//             toast={props.toast}
-//             data={props?.data}
-//             handleEdit={handleEdit}
-//             onReport={false}
-//             onDelete={_onDeleted}
-//             isZoomRequired={props.isZoomRequired}
-//             setIsZoomRequired={props.setIsZoomRequired}
-//             setArea={props.setArea}
-//           />
-//         )}
-//         {props.boundary &&
-//           <Boundary
-//             data={props.boundary}
-//             setData={props.setBoundary}
-//             isStateData={props.isStateData}
-//           />
-//         } 
-//         {polyEnd && window.innerWidth < 600 &&(
-//           <div className="tooltip-message  absolute top-[206px] left-14  bg-yellow-200 text-black px-4 py-2 rounded shadow-lg z-[1000000]">
-//             Next - Open menu and generate report
-//           </div>
-//         )}
-//       </MapContainer>
-//       <div className="download-div">
-//         <IconButton onClick={handleClick} id="account-menu">
-//           <FileDownloadOutlinedIcon
-//             fontSize="small"
-//             style={{ color: "#000" }}
-//           />
-//         </IconButton>
-//       </div>
-//       <Menu
-//         anchorEl={anchorEl}
-//         id="account-menu"
-//         open={open}
-//         onClose={() => setAnchorEl(null)}
-//         onClick={() => setAnchorEl(null)}
-//         transformOrigin={{ horizontal: "right", vertical: "top" }}
-//         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-//       >
-//         <MenuItem onClick={handleShapeFileDownload} sx={{ cursor: "pointer" }}>
-//           <AiOutlineFileText size="25" />
-//           <span style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in ShapeFile.zip</span>
-//         </MenuItem>
-//         <MenuItem onClick={handleKmlDownload} sx={{ cursor: "pointer" }}>
-//           {" "}
-//           <img
-//             className="me-1.5"
-//             src={kmlFileIcon}
-//             alt="img"
-//             height="20"
-//             width={20}
-//           />
-//           <span style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in .Kml</span>{" "}
-//         </MenuItem>
-//         <MenuItem onClick={handleGeoJSONDownload}>
-//           {" "}
-//           <VscJson size="25" />{" "}
-//           <span  style={{fontFamily:'Gandhi Sans Regular'}} className="ml-1">Download in .geojson</span>{" "}
-//         </MenuItem>
-//       </Menu>
-//     </div>
-//   );
-// }
-
-// export default Reportmap;

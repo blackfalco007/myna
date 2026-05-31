@@ -1241,6 +1241,12 @@ function Report(props) {
                     zoom={changeLayoutForReport ? 7.5 : 7.5}
                     onReady={!mapZoomOut && onMapReady}
                     initialCenter={
+                      props.selectedLocalityCoords
+                      ? {
+                          lat: props.selectedLocalityCoords.lat,
+                          lng: props.selectedLocalityCoords.lon
+                        }
+                      : 
                       MemoizedPolygonCenter.convertedData ||
                       MemoizedPolygonCenter.editedData ||
                       MemoizedPolygonCenter.boundaryData ||
@@ -1299,6 +1305,15 @@ function Report(props) {
                         strokeWeight={2.5}
                         fillOpacity={0}
 
+                      />
+                    )}
+                    {props.selectedLocalityCoords && (
+                      <Marker
+                        key="selected-locality"
+                        position={{
+                          lat: props.selectedLocalityCoords.lat,
+                          lng: props.selectedLocalityCoords.lon
+                        }}
                       />
                     )}
                     {(capturedMarkers?.length > 0 ? capturedMarkers : getHotspotAreas).map((marker) => (

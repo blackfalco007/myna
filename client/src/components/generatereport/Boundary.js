@@ -14,59 +14,105 @@ function Boundary(props) {
     const map = useMap();
 
     map.invalidateSize();
-    try {
-      if(props.data.features[0].geometry.coordinates.length==1)
-      {
-        const arrayOfCords = props.data.features[0].geometry.coordinates[0];
-        const centroid = calculateCentroid(arrayOfCords);
-        const zoom = calculateZoom(arrayOfCords);
-        map.flyTo(centroid, zoom);
 
-      }else if(props.data.features[0].geometry.coordinates[0] && props.data.features[0].geometry.type === 'Polygon'){
+    if (props.selectedLocalityCoords) {
 
-        const arrayOfCords = props.data.features[0].geometry.coordinates[0];
-        const centroid = calculateCentroid(arrayOfCords);
-        const zoom = calculateZoom(arrayOfCords);
-        map.flyTo(centroid, zoom);
-      }
-      else if(props.data.features[0].geometry.coordinates[0][0]){
-        const arrayOfCords = props.data.features[0].geometry.coordinates[0][0];
-        const centroid = calculateCentroid(arrayOfCords);
-      
-        const zoomTrue = props.data.features[0].properties.COUNTY == 'Diu';
-        map.flyTo(centroid, zoomTrue ? 12 : 7);
+      map.flyTo(
+        [
+          props.selectedLocalityCoords.lat,
+          props.selectedLocalityCoords.lon
+        ],
+        12
+      );
+
+    } else {
+
+      try {
+
+        if (props.data.features[0].geometry.coordinates.length == 1) {
+
+          const arrayOfCords =
+            props.data.features[0].geometry.coordinates[0];
+
+          const centroid =
+            calculateCentroid(arrayOfCords);
+
+          const zoom =
+            calculateZoom(arrayOfCords);
+
+          map.flyTo(centroid, zoom);
+
+        } else if (
+          props.data.features[0].geometry.coordinates[0] &&
+          props.data.features[0].geometry.type === 'Polygon'
+        ) {
+
+          const arrayOfCords =
+            props.data.features[0].geometry.coordinates[0];
+
+          const centroid =
+            calculateCentroid(arrayOfCords);
+
+          const zoom =
+            calculateZoom(arrayOfCords);
+
+          map.flyTo(centroid, zoom);
+
+        } else if (
+          props.data.features[0].geometry.coordinates[0][0]
+        ) {
+
+          const arrayOfCords =
+            props.data.features[0].geometry.coordinates[0][0];
+
+          const centroid =
+            calculateCentroid(arrayOfCords);
+
+          const zoomTrue =
+            props.data.features[0].properties.COUNTY === 'Diu';
+
+          map.flyTo(
+            centroid,
+            zoomTrue ? 12 : 7
+          );
+        }
+
+      } catch (err) {
+
+        console.error("Can't zoom", err);
+        props.setData(null);
+
       }
 
     }
-    catch(err){
-      // console.log('errrorBoundary', err);
-      console.error("Can't zoom")
-      props.setData(null)
-    }
-    // console.log("props.isStateData",props.isStateData)
+
     const blueStyle = props.isStateData
-  ? {
-      color: '#3388ff', 
-      weight: 2, 
-      opacity: 1.0,
-      fillOpacity: 0.05
-    }
-  : {
-      color: '#3388ff', 
-      weight: 2, 
-      opacity: 1.0,
-      fillOpacity: 0.15
-    };
+      ? {
+          color: '#3388ff',
+          weight: 2,
+          opacity: 1.0,
+          fillOpacity: 0.05
+        }
+      : {
+          color: '#3388ff',
+          weight: 2,
+          opacity: 1.0,
+          fillOpacity: 0.15
+        };
+
     return (
       <GeoJSON
         data={props.data}
-        style={ blueStyle}
+        style={blueStyle}
       />
     );
+
   } catch (error) {
-    // console.log(error)
-    props.setData(null)
+
+    console.error(error);
+    props.setData(null);
     toast.error("format Not Supported");
+
   }
 }
 
