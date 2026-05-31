@@ -47,12 +47,25 @@ for (const feature of districtGeoJson.features) {
   const district =
     districtName || countyName;
 
-  if (district && stateName) {
+    if (stateName) {
 
-    const key =
-      `${stateName}|${district}`;
+    // Lookup by DISTRIC field
+    if (districtName) {
 
-    districtLookup[key] = feature;
+      const districtKey =
+        `${stateName}|${districtName}`;
+
+      districtLookup[districtKey] = feature;
+    }
+
+    // Lookup by COUNTY field
+    if (countyName) {
+
+      const countyKey =
+        `${stateName}|${countyName}`;
+
+      districtLookup[countyKey] = feature;
+    }
   }
 }
 
