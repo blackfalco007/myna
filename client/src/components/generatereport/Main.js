@@ -896,6 +896,10 @@ useEffect(() => {
             </div>
             {showGeographySign ? (
               <>
+                {statesList.length === 0 && (
+                      <div>Loading geographies...</div>
+                )}
+                    
                 <FormControl fullWidth>
                   <InputLabel id="demo-simple-select-label">State</InputLabel>
                   <Select
@@ -904,6 +908,7 @@ useEffect(() => {
                     onChange={handleSelectState}
                     label="State"
                     name="state"
+                    disabled={statesList.length === 0}
                     value={selectedState}
                   >
                     {statesList.length > 0
@@ -917,6 +922,11 @@ useEffect(() => {
                       : ""}
                   </Select>
                 </FormControl>
+                {selectedState && districtList.length === 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    Loading districts...
+                  </div>
+                )}
                 <FormControl fullWidth>
                   <InputLabel id="demo-simple-select-label">
                     District
@@ -928,7 +938,7 @@ useEffect(() => {
                     label="district"
                     required
                     name="district"
-                    disabled={selectedState ? false : true}
+                    disabled={!selectedState || districtList.length === 0}
                     value={selectedCounty}
                   >
                     {districtList.length > 0
