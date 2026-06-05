@@ -4,6 +4,7 @@
  import { Map, Marker,Polygon, GoogleApiWrapper,InfoWindow } from 'google-maps-react';
  import { useSelector } from 'react-redux';
  import * as turf from '@turf/turf';
+ import { calculateRoundedValue, HEATMAP_GRID_SIZE} from "./generatereport/helpers/heatmapUtils";
  
  const center = { lat: 21.1458, lng: 79.0882 };
  
@@ -21,11 +22,7 @@
    const [newBufferdata,setNewBufferdata] = useState(null);
    const roundToTwoDecimals = (num) => Math.round(num * 1000) / 1000;
 
-   const calculateRoundedValue = (value) => {
-     const result = Math.round(value / 0.045) * 0.045;
-     return parseFloat(result.toFixed(3));
-   };
-
+  
 //  console.log("hoveredCoords",hoveredCoords);
   
   // console.log("data.paths",data.paths);

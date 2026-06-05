@@ -19,6 +19,7 @@ import EN_Logo from "../../assets/images/EN.png";
 import NT_Logo from "../../assets/images/NT.png";
 import TableCard from "./reportcomponents/TableCard";
 import { handleDownloadPdf } from "./helpers/generatePdf";
+import { handleDownloadDataPackage} from "./helpers/generateDataPackage";
 import dayjs from "dayjs";
 import Logo from "../../assets/images/logo.png";
 import CompleteListOfSpecies from "./reportcomponents/CompleteListofSpecies";
@@ -37,6 +38,8 @@ import Chart from "./BarChart";
 import * as turf from '@turf/turf';
 import { generateReportId, generateApaCitation, generateBibtex } from "../../utils/reportCitation";
 import { APP_CONFIG } from "../../config/appConfig";
+import { HEATMAP_GRID_SIZE } from "./helpers/heatmapUtils";
+import { buildSoibExportData, buildIucnExportData, buildEndemicExportData, buildWaterbirdExportData, buildCompleteListExportData, buildHeatmapGeojson} from "./helpers/reportExportTransforms";
 
 
 // import { position } from "html2canvas/dist/types/css/property-descriptors/position";
@@ -130,9 +133,203 @@ function Report(props) {
       minute: "2-digit"
     });
 
-const footerText =
-  `Generated using MYNA v${APP_CONFIG.VERSION} | ${reportId} | ${generatedTimestamp}`;
+  const footerText =
+  `Generated using MYNA ${APP_CONFIG.VERSION} | ${reportId} | ${generatedTimestamp}`;
 
+
+  const buildReportJson = ({
+      soibExportData,
+      iucnExportData,
+      endemicExportData,
+      waterbirdExportData,
+      completeListExportData
+    }) => ({
+      metadata: buildMetadataJson(),
+
+      speciesSummary: {
+        totalSpecies: getCountByScientificName?.total,
+        migratorySpecies: getCountByScientificName?.migrate,
+        threatenedSpecies: getCountByScientificName?.iucnRedList,
+        highPrioritySpecies: getCountByScientificName?.soibHighPriority,
+        scheduleISpecies: getCountByScientificName?.scheduleI,
+        endemicSpecies: getCountByScientificName?.indiaEndemic,
+        soibConservationConcernSpecies: getCountByScientificName?.soibConservationConcernSpecies,
+        citesAppendixSpecies: getCountByScientificName?.citesAppendixSpecies,
+        cmsAppendixSpecies: getCountByScientificName?.cmsAppendixSpecies,
+        iucnRedListCategories: getCountByScientificName?.iucnRedListCategoriesCount
+      },
+
+      tables: {
+        soibPrioritySpecies: soibExportData,
+        iucnRedListSpecies: iucnExportData,
+        endemicSpecies: endemicExportData,
+        waterbirdCongregations: waterbirdExportData,
+        completeSpeciesList: completeListExportData
+      },
+
+      hotspots: getHotspotAreas,
+
+      charts: {
+        mostCommonSpecies: getMostCommonSpeciesData,
+        seasonality: getSeasonalChartData,
+        speciesAccumulation: allYearsCount
+      },
+
+      effortSummary: getEffortDetails,
+
+      spatial: {
+        boundaryFile: "boundary.geojson",
+        hotspotsFile: "hotspots.geojson"
+      },
+      
+    });
+
+
+    const buildMetadataJson = () => ({
+      schemaVersion: "1.0",
+      reportId,
+      reportName,
+      generatedTimestamp,
+      datasetVersion: dataEndDate,
+      mynaVersion: APP_CONFIG.VERSION,
+      startDate,
+      endDate,
+      state: selectedState,
+      district: selectedCounty,
+      areaSqKm: area,
+      apaCitation,
+      bibtexCitation,
+      footerText: footerText,   
+      spatialReference: "EPSG:4326",
+      spatialLayers: {
+        boundary: "boundary.geojson",
+        heatmap: "heatmap.geojson",
+        hotspots: "hotspots.geojson"
+      },
+      heatmapMetadata: {
+        gridSystem: "MYNA_0.045_degree_grid",
+        gridSizeDegrees: HEATMAP_GRID_SIZE,
+        maxGridCount: highestNumber,
+        normalizationMethod:
+          "unique_group_identifiers/max_grid_count*100"
+      }
+    });
+
+    const convertToCsv = (rows) => {
+  if (!rows?.length) return "";
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCsv = (value) => {
+    if (value === null || value === undefined) return "";
+
+    const str = String(value);
+
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const csvRows = [
+    headers.map(escapeCsv).join(","),
+
+    ...rows.map(row =>
+      headers
+        .map(h => escapeCsv(row[h]))
+        .join(",")
+    )
+  ];
+
+  return csvRows.join("\r\n");
+  };
+
+  const boundaryGeojson =
+    boundary || dataForMap;
+
+  const hotspotsGeojson = {
+    type: "FeatureCollection",
+
+    features: getHotspotAreas.map(h => ({
+      type: "Feature",
+
+      geometry: {
+        type: "Point",
+        coordinates: [
+          h.longitude,
+          h.latitude
+        ]
+      },
+
+      properties: {
+        hotspotId: h.localityId,
+        hotspotName: h.locality,
+        speciesCount: h.speciesCount
+      }
+    }))
+  };
+
+
+  const downloadDataPackage = () => {
+    const soibExportData =
+    buildSoibExportData(getSoibConcernStatus);
+    
+    const iucnExportData = 
+    buildIucnExportData(getDataForIucnRedListTable);
+
+    const endemicExportData =
+    buildEndemicExportData(getDataForEndemicSpeciesTable);
+    
+    const waterbirdExportData =
+    buildWaterbirdExportData(getDataForWaterbirdCongregation);
+
+    const completeListExportData =
+    buildCompleteListExportData(completeListOfSpecies);
+
+    const reportJson =
+    buildReportJson({
+      soibExportData,
+      iucnExportData,
+      endemicExportData,
+      waterbirdExportData,
+      completeListExportData
+    });
+
+    
+    handleDownloadDataPackage({
+      reportId,
+
+      reportJson,
+
+      metadataJson: buildMetadataJson(),
+
+      boundaryGeojson:
+        boundary || dataForMap,
+
+      hotspotsGeojson,
+      heatmapGeojson,
+    
+      completeListOfSpeciesCsv: convertToCsv(completeListExportData),
+      completeListOfSpeciesJson: completeListExportData,
+  
+      getDataForIucnRedListTableCsv: convertToCsv(iucnExportData),
+      getDataForIucnRedListTableJson: iucnExportData,
+      
+      getDataForEndemicSpeciesTableCsv: convertToCsv(endemicExportData),
+      getDataForEndemicSpeciesTableJson: endemicExportData,
+      
+      getSoibConcernStatusCsv: convertToCsv(soibExportData),
+      getSoibConcernStatusJson: soibExportData,
+      
+      getDataForWaterbirdCongregationCsv: convertToCsv(waterbirdExportData),
+      getDataForWaterbirdCongregationJson: waterbirdExportData,
+    
+      getSeasonalChartData,
+
+      allYearsCount,
+
+      getMostCommonSpeciesData,
+
+      getEffortDetails
+    });
+  };
 
   const [pdfDownloadStatus, setPdfDownloadStatus] = useState("Download Pdf");
   const [changeLayoutForReport, setChangeLayoutForReport] = useState(false);
@@ -151,6 +348,12 @@ const footerText =
   const [mapZoomOut,setMapZoomOut] = useState(false);
   const [highestNumber, sethighestNumber] = useState(null);
   const [newBufferdata,setNewBufferdata] = useState(null);
+  
+  const heatmapGeojson =
+    buildHeatmapGeojson(
+      completeListOfSpeciesGi
+  );
+
   useEffect(() => {
     if (Object.keys(allYearsCount).length > 0) {
       setIsBarChartloaded(true);
@@ -253,93 +456,6 @@ const footerText =
   },[dataForMap]);
 
 
-  // console.log("stateNamestateNamestateNamestateName",stateName)
-
-  //       lat: (latSum ) / totalPoints,
-  //       lng: lngSum / totalPoints,
-  //     };
-  //     return center;
-  //   }
-  // }
-  // const getPolygonCenter = (polygon, google) => {
-  //   console.log('polygon',polygon)
-  //   try {
-  //     if (polygon && polygon.length > 0 && google) {
-  //       console.log('polygon',polygon)
-  //       const bounds = new google.maps.LatLngBounds();
-
-  //       try {
-  //         // Extend the bounds to include each point in the polygon
-  //         if (Array.isArray(polygon[0][0])) {
-  //           polygon.forEach((polygonPart) => {
-  //             polygonPart.forEach((point) => {
-  //               try {
-  //                 if (isFinite(point.lat) && isFinite(point.lng)) {
-  //                   bounds.extend(new google.maps.LatLng(point.lat, point.lng));
-  //                 } else {
-  //                   console.warn("Invalid coordinates detected:", point);
-  //                 }
-  //               } catch (error) {
-  //                 console.error("Error extending bounds with point:", point, error);
-  //               }
-  //             });
-  //           });
-  //         } else {
-  //           polygon.forEach((point) => {
-  //             try {
-  //               if (isFinite(point.lat) && isFinite(point.lng)) {
-  //                 bounds.extend(new google.maps.LatLng(point.lat, point.lng));
-  //               } else {
-  //                 console.warn("Invalid coordinates detected:", point);
-  //               }
-  //             } catch (error) {
-  //               console.error("Error extending bounds with point:", point, error);
-  //             }
-  //           });
-  //         }
-  //       } catch (error) {
-  //         console.error("Error processing polygon parts:", error);
-  //       }
-
-  //       try {
-  //         console.log(bounds);
-  //         const center = bounds.getCenter();
-  //         console.log("center", center);
-
-  //         const centerLat = center.lat();
-  //         const centerLng = center.lng();
-
-  //         // If the center returns NaN, use the manual fallback logic
-  //         if (isNaN(centerLat) || isNaN(centerLng)) {
-  //           console.warn("Bounds returned NaN for center, using manual calculation.");
-
-  //           const totalPoints = polygon.length;
-  //           const latSum = polygon.reduce((sum, point) => sum + point.lat, 0);
-  //           const lngSum = polygon.reduce((sum, point) => sum + point.lng, 0);
-  //           const manualCenter = {
-  //             lat: latSum / totalPoints,
-  //             lng: lngSum / totalPoints,
-  //           };
-  //           console.log('manualCenter',manualCenter);
-  //           return manualCenter;
-  //         }
-
-  //         // Return the bounds center if valid
-  //         console.log({ lat: centerLat, lng: centerLng });
-  //         return { lat: centerLat, lng: centerLng };
-  //       } catch (error) {
-  //         console.error("Error getting center of bounds:", error);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Error in getPolygonCenter function:", error);
-  //   }
-
-  //   // Fallback in case polygon is empty
-  //   console.log("Fallback - polygon is empty or not provided");
-  //   return { lat: 25.21, lng: 79.32 };
-  // };
-  //  console.log("???????????/",props.google.maps.LatLngBounds()) 
   const getPolygonCenter = (polygon, google) => {
     if (polygon && polygon.length > 0 && google) {
       const bounds = new google.maps.LatLngBounds();
@@ -384,55 +500,6 @@ const footerText =
 
     return { lat: 25.21, lng: 79.32 };
   };
-
-
-
-  // const memoizedData = useMemo(() => {
-  //   return [convertedData, boundaryData, formattedData].find((d) => d && d !== false);
-  // }, [convertedData, boundaryData, formattedData]);
-
-  // useEffect(() => {
-  //   try {
-  //     if (memoizedData && memoizedData.length > 0) {
-  //       console.log('memoizedData',memoizedData);
-  //       // Flatten the nested multipolygon array
-  //       const flattenCoordinates = (coordinates) => {
-  //         return coordinates.flatMap((coord) => {
-  //           if (Array.isArray(coord)) {
-  //             return flattenCoordinates(coord);
-  //           }
-  //           return coord;
-  //         });
-  //       };
-
-  //       const flattenedData = flattenCoordinates(memoizedData);
-
-  //       const latitudes = flattenedData.map((p) => p.lat);
-  //       const longitudes = flattenedData.map((p) => p.lng);
-
-  //       const latMin = Math.min(...latitudes);
-  //       const latMax = Math.max(...latitudes);
-  //       const lngMin = Math.min(...longitudes);
-  //       const lngMax = Math.max(...longitudes);
-
-  //       setGridBounds((prevBounds) => {
-  //         const newBounds = { latMin, latMax, lngMin, lngMax };
-  //         if (
-  //           prevBounds.latMin !== newBounds.latMin ||
-  //           prevBounds.latMax !== newBounds.latMax ||
-  //           prevBounds.lngMin !== newBounds.lngMin ||
-  //           prevBounds.lngMax !== newBounds.lngMax
-  //         ) {
-  //           return newBounds;
-  //         }
-  //         return prevBounds;
-  //       });
-  //     }
-  //   } catch (e) {
-  //     console.log('error', e);
-  //   }
-  // }, [memoizedData]);
-
 
 
   // Calculate the center of the polygon
@@ -712,42 +779,6 @@ const footerText =
 
   const timeoutRef = useRef(null);
 
-  // const handleMouseOver = (marker) => {
-  //   // clearTimeout(timeoutRef.current);
-  //   // timeoutRef.current = setTimeout(() => {
-  //     // Only update state if a different marker is hovered
-  //     // if (!activeMarker || activeMarker.localityId !== marker.localityId) {
-  //       // setActiveMarker(marker);
-  //       // setShowInfoWindow(true);
-  //     // }
-  //   // }, 100); 
-  //   console.log('data', marker)
-  // }
-  // const handleMouseOver = (marker) => {
-  //   // debugger;
-  //   // clearTimeout(timeoutRef.current);
-
-  //   // Debounce the state update to prevent flickering on rapid hover
-  //   // timeoutRef.current = setTimeout(() => {
-  //     // Update the state only if the hovered marker is different
-  //     // if (!activeMarker || activeMarker.localityId !== marker.localityId) {
-  //       setActiveMarker(marker);
-  //       setShowInfoWindow(true);
-  //     // }
-  //   // }, 100); // You can adjust the delay
-  // };
-
-  // // Memoized mouseout handler
-  // const handleMouseOut = () => {
-  //   // clearTimeout(timeoutRef.current);
-  //   // timeoutRef.current = setTimeout(() => {
-  //     // setActiveMarker(null);
-  //     // setShowInfoWindow(false);
-  //   // }, 100); // Debouncing mouseout as well
-  // }
-
-
-
 
   const MemoizedPolygonCenter = useMemo(() => {
     return {
@@ -757,9 +788,6 @@ const footerText =
       formattedData: formattedData && getPolygonCenter(formattedData, props.google)
     };
   }, [convertedData, editedData, boundaryData, formattedData, props.google]);
-
-
-
 
 
   const handleMarkerClick = (marker) => {
@@ -788,47 +816,6 @@ const footerText =
 
   const roundToTwoDecimals = (num) => Math.round(num * 100) / 100;
 
-
-
-
-
-//   function isBoundaryOutsideIndia(boundary) {
-    
-//     const indiaData = {
-//       "type": "FeatureCollection",
-//       "features": [
-//         {
-//           "type": "Feature",
-//           "id": "IND",
-//           "properties": { "name": "India" },
-//           "geometry": {
-//             "type": "Polygon",
-//             "coordinates": [
-//               [
-      // {"type":"Feature","id":"IND","properties":{"name":"India"},"geometry":{"type":"Polygon","coordinates":[[[77.837451,35.49401],[78.912269,34.321936],[78.811086,33.506198],[79.208892,32.994395],[79.176129,32.48378],[78.458446,32.618164],[78.738894,31.515906],[79.721367,30.882715],[81.111256,30.183481],[80.476721,29.729865],[80.088425,28.79447],[81.057203,28.416095],[81.999987,27.925479],[83.304249,27.364506],[84.675018,27.234901],[85.251779,26.726198],[86.024393,26.630985],[87.227472,26.397898],[88.060238,26.414615],[88.174804,26.810405],[88.043133,27.445819],[88.120441,27.876542],[88.730326,28.086865],[88.814248,27.299316],[88.835643,27.098966],[89.744528,26.719403],[90.373275,26.875724],[91.217513,26.808648],[92.033484,26.83831],[92.103712,27.452614],[91.696657,27.771742],[92.503119,27.896876],[93.413348,28.640629],[94.56599,29.277438],[95.404802,29.031717],[96.117679,29.452802],[96.586591,28.83098],[96.248833,28.411031],[97.327114,28.261583],[97.402561,27.882536],[97.051989,27.699059],[97.133999,27.083774],[96.419366,27.264589],[95.124768,26.573572],[95.155153,26.001307],[94.603249,25.162495],[94.552658,24.675238],[94.106742,23.850741],[93.325188,24.078556],[93.286327,23.043658],[93.060294,22.703111],[93.166128,22.27846],[92.672721,22.041239],[92.146035,23.627499],[91.869928,23.624346],[91.706475,22.985264],[91.158963,23.503527],[91.46773,24.072639],[91.915093,24.130414],[92.376202,24.976693],[91.799596,25.147432],[90.872211,25.132601],[89.920693,25.26975],[89.832481,25.965082],[89.355094,26.014407],[88.563049,26.446526],[88.209789,25.768066],[88.931554,25.238692],[88.306373,24.866079],[88.084422,24.501657],[88.69994,24.233715],[88.52977,23.631142],[88.876312,22.879146],[89.031961,22.055708],[88.888766,21.690588],[88.208497,21.703172],[86.975704,21.495562],[87.033169,20.743308],[86.499351,20.151638],[85.060266,19.478579],[83.941006,18.30201],[83.189217,17.671221],[82.192792,17.016636],[82.191242,16.556664],[81.692719,16.310219],[80.791999,15.951972],[80.324896,15.899185],[80.025069,15.136415],[80.233274,13.835771],[80.286294,13.006261],[79.862547,12.056215],[79.857999,10.357275],[79.340512,10.308854],[78.885345,9.546136],[79.18972,9.216544],[78.277941,8.933047],[77.941165,8.252959],[77.539898,7.965535],[76.592979,8.899276],[76.130061,10.29963],[75.746467,11.308251],[75.396101,11.781245],[74.864816,12.741936],[74.616717,13.992583],[74.443859,14.617222],[73.534199,15.990652],[73.119909,17.92857],[72.820909,19.208234],[72.824475,20.419503],[72.630533,21.356009],[71.175273,20.757441],[70.470459,20.877331],[69.16413,22.089298],[69.644928,22.450775],[69.349597,22.84318],[68.176645,23.691965],[68.842599,24.359134],[71.04324,24.356524],[70.844699,25.215102],[70.282873,25.722229],[70.168927,26.491872],[69.514393,26.940966],[70.616496,27.989196],[71.777666,27.91318],[72.823752,28.961592],[73.450638,29.976413],[74.42138,30.979815],[74.405929,31.692639],[75.258642,32.271105],[74.451559,32.7649],[74.104294,33.441473],[73.749948,34.317699],[74.240203,34.748887],[75.757061,34.504923],[76.871722,34.653544],[77.837451,35.49401]]]}} 
-//     ]
-//   ]
-// }
-// }
-// ]
-// };
-// console.log("indiaData.features[0].geometry.coordinates",indiaData.features[0].geometry.coordinates)
-  
-//   const india = turf.polygon(indiaData.features[0].geometry.coordinates);
-  
-//   if (!boundary.geometry.coordinates || boundary.geometry.coordinates.length === 0) {
-//     console.error("Invalid boundary: No coordinates found.");
-//     return false;
-//   }
-//   const boundaryCoordinates = boundary;
-//   const boundaryPolygon = turf.polygon([boundaryCoordinates]);
-//   const isInsideIndia = turf.booleanContains(india, boundaryPolygon);
-//   console.log("isInsideIndia",isInsideIndia);
-//   return !isInsideIndia;
-//   }
-  
-
-
   const indiaBounds = {
     north: 37.0841,   
     south: 6.4627,     
@@ -842,10 +829,6 @@ const footerText =
       strictBounds: true,   
     },
   }
-
- 
-
-
   useEffect(() => {
     if (!props.bufferData) return;
   
@@ -943,7 +926,7 @@ const footerText =
                    }
                       <div className="me-4">
                         <Tooltip
-                          title="Download"
+                          title="Download Pdf"
                           className={changeLayoutForReport && "invisible"}
                           placement="top"
                           arrow
@@ -969,20 +952,27 @@ const footerText =
                         </Tooltip>
                       </div>
 
-                      <div>
+                        <div className="d-flex align-items-center" style={{ gap: "12px" }}>
+                        <button
+                          onClick={downloadDataPackage}
+                          className="px-3 py-1 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
+                        >
+                          Download Data
+                        </button>
+
                         <Tooltip
                           title="Close"
                           className={changeLayoutForReport ? "invisible" : undefined}
                           placement="top"
                           arrow
-                          enterTouchDelay={0} // show immediately on tap
-                          leaveTouchDelay={4000} // stays visible for 4s
+                          enterTouchDelay={0}
+                          leaveTouchDelay={4000}
                           PopperProps={{
                             modifiers: [
                               {
-                                name: 'preventOverflow',
+                                name: "preventOverflow",
                                 options: {
-                                  boundary: 'viewport',
+                                  boundary: "viewport",
                                 },
                               },
                             ],
@@ -990,7 +980,10 @@ const footerText =
                         >
                           <CloseIcon
                             onClick={closeHandler}
-                            style={{ cursor: 'pointer' }}
+                            style={{
+                              cursor: "pointer",
+                              fontSize: "28px"
+                            }}
                           />
                         </Tooltip>
                       </div>
@@ -1654,19 +1647,28 @@ const footerText =
       </div>
 
 
-      <div className={"grid grid-cols-2  py-3 px-8"}>
-        <div className="text-left"> </div>
+      <div className={"grid grid-cols-2 py-3 px-8"}>
+        <div className="text-left"></div>
 
-        <div className="px-4 text-right gandhi-family">
+        <div
+          className="px-4 text-right gandhi-family flex justify-end items-center"
+          style={{ gap: "8px" }}
+        >
           <button
-            disabled={getCountByScientificName?.total ? false : true}
+            disabled={!getCountByScientificName?.total}
             onClick={() => {
-              // handleZoomChange();
               setChangeLayoutForReport(true);
             }}
-            className=" min-w-[145px] text-right mt-4  px-4 py-2 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
+            className="min-w-[145px] px-4 py-2 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
           >
             {pdfDownloadStatus}
+          </button>
+
+          <button
+            onClick={downloadDataPackage}
+            className="min-w-[145px] px-4 py-2 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
+          >
+            Download Data
           </button>
         </div>
       </div>
