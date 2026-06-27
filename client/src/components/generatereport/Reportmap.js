@@ -27,6 +27,7 @@ import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import markerRed from "../../assets/images/marker-icon-red.png";
 import markerShadow from "../../assets/images/marker-shadow.png";
+import { ScaleControl } from "react-leaflet";
 
 const redIcon = new L.Icon({
   iconUrl: markerRed,
@@ -71,13 +72,10 @@ function Reportmap(props) {
   const [polyMapPropsCords, setpolyMapPropsCords] = useState(null);
   const { startPolygonDrawing, setStartPolygonDrawing } = useDrawing();
   const [polyEnd, setPolyEnd] = useState(false);
+  
   function PolygonDrawer({ startPolygonDrawing, setStartPolygonDrawing,setPolyEnd }) {
     const map = useMap();
-    console.log(
-      "LOCALITY COORDS IN BOUNDARY",
-      props.selectedLocalityCoords
-    );
-  
+    
     useEffect(() => {
       if (startPolygonDrawing && map) {
         map.pm.enableDraw("Polygon", {
@@ -86,12 +84,12 @@ function Reportmap(props) {
             color: "rgb(51, 136, 255)",
           },
         });
-  
+  /*
         map.on("pm:create", () => {
           setStartPolygonDrawing(false);
           setPolyEnd(true);
           map.pm.disableDraw();
-        });
+        });*/
       }
     }, [startPolygonDrawing, map]);
   
@@ -109,16 +107,44 @@ function Reportmap(props) {
 
 
   const _onCreate = (e) => {
-    props.setMediumForReport("polygonR")
+    props.setMediumForReport("polygonR");
+
     const coordinates = e.layer._latlngs;
 
-    const coordinatesForFile = [
-      coordinates[0].map((point) => [point.lng, point.lat]),
-    ];
-    
+    const ring = coordinates[0].map(
+      point => [point.lng, point.lat]
+    );
+
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+
+    if (
+      first[0] !== last[0] ||
+      first[1] !== last[1]
+    ) {
+      ring.push([...first]);
+    }
+
+    const coordinatesForFile = [ring];
+
     props.setShowGeographySign(false);
     props.setNewPolygon(e);
-    setEditedData(coordinates[0]);
+    //setEditedData(coordinates[0]);
+
+    
+    props.setAllEditedData(prev => {
+  
+    const updated = [
+      ...(prev || []),
+      coordinates[0]
+    ];
+
+
+  return updated;
+});
+
+setEditedData(coordinates[0]);
+
     const feature = {
       type: "Feature",
       properties: {},
@@ -127,18 +153,43 @@ function Reportmap(props) {
         coordinates: coordinatesForFile,
       },
     };
-    const featureCollection = {
-      type: "FeatureCollection",
-      features: [feature],
-    };
-    const geoJSONString = JSON.stringify(featureCollection, null, 2);
-    const blob = new Blob([geoJSONString], { type: "application/json" });
-    props.setGeoJson(blob);
+
+    props.setAllFeatures(prev => {
+
+      const updatedFeatures = [
+        ...(prev || []),
+        feature
+      ];
+
+      const featureCollection = {
+        type: "FeatureCollection",
+        features: updatedFeatures,
+      };
+
+      const geoJSONString = JSON.stringify(
+        featureCollection,
+        null,
+        2
+      );
+
+      const blob = new Blob(
+        [geoJSONString],
+        { type: "application/json" }
+      );
+
+      
+      props.setGeoJson(blob);
+
+      
+      return updatedFeatures;
+    });
   };
+
   const _onDeleted = (e) => {
     props.removeFile();
     props.setNewPolygon(null);
     props.setGeoJson(null);
+    props.setAllFeatures([]);
   };
   // const _onEditPath = (e) => {};
   const open = Boolean(anchorEl);
@@ -501,11 +552,17 @@ useEffect(()=>{
         scrollWheelZoom={true}
       // zoomControl={false}
       >
-                <PolygonDrawer
-    startPolygonDrawing={startPolygonDrawing}
-    setStartPolygonDrawing={setStartPolygonDrawing}
-    setPolyEnd={setPolyEnd}
-  />
+      <ScaleControl
+        position="topright"
+        imperial={false}
+        metric={true}
+      />
+
+      <PolygonDrawer
+        startPolygonDrawing={startPolygonDrawing}
+        setStartPolygonDrawing={setStartPolygonDrawing}
+        setPolyEnd={setPolyEnd}
+      />
 
         <ReactLeafletGoogleLayer
           googleMapsLoaderConf={{ region: "IN" }}
@@ -569,7 +626,6 @@ useEffect(()=>{
         } 
         {props.selectedLocalityCoords && (
           <>
-        {console.log("RENDERING MARKER")}
         <Marker
           position={[
             props.selectedLocalityCoords.lat,

@@ -38,12 +38,14 @@ import Chart from "./BarChart";
 import * as turf from '@turf/turf';
 import { generateReportId, generateApaCitation, generateBibtex } from "../../utils/reportCitation";
 import { APP_CONFIG } from "../../config/appConfig";
-import { HEATMAP_GRID_SIZE } from "./helpers/heatmapUtils";
+import { HEATMAP_CLASSES, HEATMAP_GRID_SIZE } from "./helpers/heatmapUtils";
 import { buildSoibExportData, buildIucnExportData, buildEndemicExportData, buildWaterbirdExportData, buildCompleteListExportData, buildHeatmapGeojson} from "./helpers/reportExportTransforms";
-
+import CircularProgress from "@mui/material/CircularProgress";
 
 // import { position } from "html2canvas/dist/types/css/property-descriptors/position";
 function Report(props) {
+
+  const googleMapRef = useRef(null);
   const {
     boundary,
     setBoundary,
@@ -78,6 +80,11 @@ function Report(props) {
     mediumForReport,
   } = props;
 
+  
+  const hotspotArray =
+  Array.isArray(getHotspotAreas)
+    ? getHotspotAreas
+    : [];
 
   const isTablet = useMediaQuery({ minWidth: 106, maxWidth: 624 });
   const monthNames = [
@@ -167,7 +174,7 @@ function Report(props) {
         completeSpeciesList: completeListExportData
       },
 
-      hotspots: getHotspotAreas,
+      hotspots: hotspotArray,
 
       charts: {
         mostCommonSpecies: getMostCommonSpeciesData,
@@ -247,7 +254,7 @@ function Report(props) {
   const hotspotsGeojson = {
     type: "FeatureCollection",
 
-    features: getHotspotAreas.map(h => ({
+    features: hotspotArray.map(h => ({
       type: "Feature",
 
       geometry: {
@@ -425,8 +432,55 @@ function Report(props) {
   };
 
   // console.log("dataForMap",dataForMap);
-  let convertedData = dataForMap?.features[0]?.geometry?.coordinates[0]?.map(([lng, lat]) => ({ lat, lng }));
-     if(editedData){
+  let convertedData = null;
+
+const geometry =
+  dataForMap?.features?.[0]?.geometry;
+
+if (geometry?.type === "Polygon") {
+
+  convertedData =
+    geometry.coordinates[0]
+      .map(([lng, lat]) => ({ lat, lng }));
+
+} else if (geometry?.type === "MultiPolygon") {
+
+  convertedData =
+    geometry.coordinates[0][0]
+      .map(([lng, lat]) => ({ lat, lng }));
+
+}
+
+
+const allFeaturePolygons =
+  dataForMap?.features?.flatMap(feature => {
+
+    const geometry = feature.geometry;
+
+    if (geometry?.type === "Polygon") {
+      return [
+        geometry.coordinates[0].map(
+          ([lng, lat]) => ({ lat, lng })
+        )
+      ];
+    }
+
+    if (geometry?.type === "MultiPolygon") {
+      return geometry.coordinates.map(
+        polygon =>
+          polygon[0].map(([lng, lat]) => ({
+            lat,
+            lng
+          }))
+      );
+    }
+
+    return [];
+
+  });
+
+  
+  if(editedData){
        convertedData =null;
      }
   const boundaryData = boundary?.features[0]?.geometry.type == 'Polygon'
@@ -442,11 +496,12 @@ function Report(props) {
 
   const formattedData = newData && newData?.map(polygon => polygon[0]?.map(([lng, lat]) => ({ lat, lng })));
 
+
   useEffect(() => {
-    if (getHotspotAreas.length > 0 && polygonData.length === 0) {
-      setPolygonData(getHotspotAreas);
+    if (hotspotArray.length > 0 && polygonData.length === 0) {
+      setPolygonData(hotspotArray);
     }
-  }, [getHotspotAreas]);
+  }, [hotspotArray]);
 
 
   useEffect(()=>{
@@ -505,7 +560,6 @@ function Report(props) {
   // Calculate the center of the polygon
   // const polygonCenter = getPolygonCenter(polygonData, props.google);
 
-  const mapRef = useRef(null);
 
   // This function will calculate and return the bounds for the boundary data
   const getBoundsForPolygon = (boundaryData) => {
@@ -517,15 +571,41 @@ function Report(props) {
   };
 
   // This will be triggered when the map is loaded
-  const onMapReady = (mapProps, map) => {
-    const dataToUse = boundaryData || convertedData || editedData;
+const onMapReady = (mapProps, map) => {
 
-    if (dataToUse) {
-      const bounds = getBoundsForPolygon(dataToUse);
-      map.fitBounds(bounds);
-    }
-  };
+  const polygons =
+    allFeaturePolygons?.length > 0
+      ? allFeaturePolygons
+      : props.allEditedData?.length > 0
+        ? props.allEditedData
+        : boundaryData || convertedData || editedData;
 
+  if (!polygons) return;
+
+  const bounds = new mapProps.google.maps.LatLngBounds();
+
+  if (
+    Array.isArray(polygons[0]) &&
+    polygons[0][0]?.lat !== undefined
+  ) {
+
+    polygons.forEach(poly => {
+      poly.forEach(point => {
+        bounds.extend(point);
+      });
+    });
+
+  } else {
+
+    polygons.forEach(point => {
+      bounds.extend(point);
+    });
+
+  }
+  map.fitBounds(bounds);
+  console.log("Final zoom:", map.getZoom());
+  
+};
 
 
 
@@ -688,18 +768,13 @@ function Report(props) {
     if (changeLayoutForReport) {
       const style = document.createElement('style');
       style.innerHTML = `
-        .gm-style a {
-          display: none !important;
-        }
-        button.gm-control-active.gm-fullscreen-control {
-          display: none;
-        }
-        .gmnoprint {
-          display: none;
-        }
         .gm-style-iw-t {
          display: none;
        }
+        button[aria-label="Keyboard shortcuts"],
+        button[title="Keyboard shortcuts"] {
+          display: none !important;
+        }
       `;
       style.id = "customMapStyles"; // Give the style a unique ID
       document.head.appendChild(style);
@@ -747,6 +822,55 @@ function Report(props) {
 
   const [downloadTriggered, setDownloadTriggered] = useState(false);
 
+  const reportReady =
+  getCountByScientificName?.total !== undefined &&
+  completeListOfSpeciesFetchSuccessFully &&
+  isBarChartloaded;
+
+  const buttonBase =
+  "flex items-center justify-center gap-2 rounded-md px-4 py-2 font-semibold transition-all duration-200 shadow-sm w-full sm:w-auto";
+
+const buttonEnabled =
+  `${buttonBase}
+   bg-[#8A6A5A]
+   text-white
+   hover:bg-[#6F5447]
+   hover:shadow-md
+   cursor-pointer`;
+
+const buttonDisabled =
+  `${buttonBase}
+   bg-gray-300
+   text-gray-500
+   cursor-not-allowed
+   shadow-none`;
+  
+  const downloadButtonClass = `
+    flex items-center gap-2
+    px-4 py-2
+    rounded-md
+    border
+    border-indigo-200
+    text-indigo-600
+    font-medium
+    transition-all
+    duration-200
+  `;
+
+  const downloadButtonEnabled =
+    `${downloadButtonClass}
+    bg-white
+    hover:bg-[#DAB830]
+    hover:text-white
+    cursor-pointer`;
+
+  const downloadButtonDisabled =
+    `${downloadButtonClass}
+    bg-gray-100
+    text-gray-400
+    border-gray-200
+    cursor-not-allowed`;
+
   const handleDownloadClick = () => {
     setMapZoomOut(true)   
     if (otherScreen.current) {
@@ -767,11 +891,13 @@ function Report(props) {
   const triggerDownload = (value) => {
     setDownloadTriggered(value);
     console.log('Initiating PDF download...');
+
     setChangeLayoutForReport(value);
     setTimeout(() => {
       scrollToTop();
     }, 1000);
   };
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -781,7 +907,9 @@ function Report(props) {
 
 
   const MemoizedPolygonCenter = useMemo(() => {
+    
     return {
+    
       convertedData: convertedData && getPolygonCenter(convertedData, props.google),
       editedData: editedData && getPolygonCenter(editedData, props.google),
       boundaryData: boundaryData && getPolygonCenter(boundaryData, props.google),
@@ -797,7 +925,7 @@ function Report(props) {
   const [capturedMarkers, setCapturedMarkers] = useState([]);
   useEffect(() => {
     if (changeLayoutForReport) {
-      const mapMarkers = getHotspotAreas.map(marker => ({
+      const mapMarkers = hotspotArray.map(marker => ({
         id: marker.localityId,
         position: { lat: marker.latitude, lng: marker.longitude },
         onMouseover: () => handleMarkerClick(marker),
@@ -805,7 +933,7 @@ function Report(props) {
       }));
       setCapturedMarkers(mapMarkers);
     } else {
-      setCapturedMarkers(getHotspotAreas?.map(marker => ({
+      setCapturedMarkers(hotspotArray.map(marker => ({
         id: marker.localityId,
         position: { lat: marker.latitude, lng: marker.longitude },
         onMouseover: () => handleMarkerClick(marker),
@@ -855,7 +983,7 @@ function Report(props) {
   }, [props.bufferData]);
   
 
-  
+
   return (
     <Fragment>
       <div style={{ backgroundColor: "#ffffff00" }}>
@@ -925,67 +1053,56 @@ function Report(props) {
                       </div>
                    }
                       <div className="me-4">
-                        <Tooltip
-                          title="Download Pdf"
-                          className={changeLayoutForReport && "invisible"}
-                          placement="top"
-                          arrow
-                          enterTouchDelay={0} // show immediately on tap
-                          leaveTouchDelay={4000} // stays visible for 4s
-                          PopperProps={{
-                            modifiers: [
-                              {
-                                name: 'preventOverflow',
-                                options: {
-                                  boundary: 'viewport',
-                                },
-                              },
-                            ],
-                          }}
-                        >
-                          {getCountByScientificName?.total &&
-                            <FileDownloadOutlinedIcon
-                              onClick={() => handleDownloadClick(true)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                          }
-                        </Tooltip>
-                      </div>
+
+{!reportReady ? (
+
+  <div className="flex items-center gap-3 text-white font-semibold">
+    <CircularProgress
+      size={18}
+      sx={{ color: "white" }}
+    />
+    <span>{pdfDownloadStatus}</span>
+  </div>
+
+) : (
+
+  getCountByScientificName?.total && (
+
+    <button
+      onClick={handleDownloadClick}
+      className={buttonEnabled}
+    >
+      <FileDownloadOutlinedIcon fontSize="small" />
+      <span>Download PDF</span>
+    </button>
+
+  )
+
+)}
+
+</div>
 
                         <div className="d-flex align-items-center" style={{ gap: "12px" }}>
-                        <button
-                          onClick={downloadDataPackage}
-                          className="px-3 py-1 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
-                        >
-                          Download Data
-                        </button>
+    {reportReady && (
+    <button
+        onClick={downloadDataPackage}
+        className={buttonEnabled}
+    >
+        <FileDownloadOutlinedIcon fontSize="small" />
+        <span>Download Data</span>
+    </button>
+)}
 
-                        <Tooltip
-                          title="Close"
-                          className={changeLayoutForReport ? "invisible" : undefined}
-                          placement="top"
-                          arrow
-                          enterTouchDelay={0}
-                          leaveTouchDelay={4000}
-                          PopperProps={{
-                            modifiers: [
-                              {
-                                name: "preventOverflow",
-                                options: {
-                                  boundary: "viewport",
-                                },
-                              },
-                            ],
-                          }}
-                        >
-                          <CloseIcon
-                            onClick={closeHandler}
-                            style={{
-                              cursor: "pointer",
-                              fontSize: "28px"
-                            }}
-                          />
-                        </Tooltip>
+                        <Tooltip title="Close" arrow>
+  <CloseIcon
+    onClick={reportReady ? closeHandler : undefined}
+    style={{
+        cursor: reportReady ? "pointer" : "not-allowed",
+        opacity: reportReady ? 1 : 0.35,
+        fontSize: 28,
+    }}
+/>
+</Tooltip>
                       </div>
 
                     </div>
@@ -1259,27 +1376,53 @@ function Report(props) {
 
             <div className="mb-16 py-4 sm:px-0 lg:px-10 md:px-0" style={{ height: "70vh" }}>
               <div className="p-2 grid grid-cols-1 md:grid-cols-3  mx-0 md:mx-20 lg:mx-20 mb-16" style={{ height: "70vh" }}>
-                <div className="grid col-span-2" ref={otherScreen} >
-                  <Map
-                    ref={mapRef}
-                    className=""
-                    style={{
-                      height: "58vh",
-                      // width: mapZoomOut ? "58vw" : window.innerWidth < 768 ? "90vw" : "58vw"
-                      width: window.innerWidth < 768 ? "90vw" : "58vw"
+                <div
+  className="grid col-span-2"
+  ref={otherScreen}
+>
+  <div
+    style={{
+      position: "relative",
+      height: "58vh",
+      width:
+        changeLayoutForReport
+          ? "100%"
+          : window.innerWidth < 768
+            ? "90vw"
+            : "58vw",
+    }}
+  >
 
+                  <Map
+                    className=""
+                      style={{
+                      height: "100%",
+                      width: "100%"
                     }}
                     google={props.google}
-                    mapTypeControl={false}
+                    mapTypeControl={true}
+                    zoomControl={true}
+                    fullscreenControl={true}
+
                     scaleControl={true}
                     scaleControlOptions={{
-                      position: props.google.maps.ControlPosition.BOTTOM_LEFT
+                      position: props.google.maps.ControlPosition.BOTTOM_RIGHT
                     }}
+
                     streetViewControl={false}
                     panControl={false}
                     rotateControl={false}
-                    zoom={changeLayoutForReport ? 7.5 : 7.5}
-                    onReady={!mapZoomOut && onMapReady}
+                    onReady={(mapProps, map) => {
+                        googleMapRef.current = map;
+
+                        map.addListener("idle", () => {
+                            console.log("GOOGLE MAP IDLE");
+                        });
+                        if (!mapZoomOut) {
+                            onMapReady(mapProps, map);
+                        }
+                        
+                    }}
                     initialCenter={
                       props.selectedLocalityCoords
                       ? {
@@ -1307,27 +1450,30 @@ function Report(props) {
                       />
                     )}
 
-                    { !boundaryData && editedData && (
+                    
+                    {props.allEditedData?.map((poly, idx) => (
                       <Polygon
-                        paths={editedData}
-                        strokeColor="#0000FF"
-                        strokeOpacity={0.8}
-                        strokeWeight={2.5}
-                        fillOpacity={0}
-
-                      />
-                    )}
-
-                    {convertedData && (
-                      <Polygon
-                        paths={convertedData}
+                        key={idx}
+                        paths={poly}
                         strokeColor="#0000FF"
                         strokeOpacity={0.8}
                         strokeWeight={2.5}
                         fillOpacity={0}
                       />
-                    )}
+                    ))}
 
+                    
+                    {allFeaturePolygons?.map((poly, idx) => (
+  <Polygon
+    key={idx}
+    paths={poly}
+    strokeColor="#0000FF"
+    strokeOpacity={0.8}
+    strokeWeight={2.5}
+    fillOpacity={0}
+  />
+))}
+                    
                     {boundaryData && (
                       <Polygon
                         paths={boundaryData}
@@ -1364,7 +1510,7 @@ function Report(props) {
                       />
                     ))}
 
-                    {getHotspotAreas && getHotspotAreas?.map(marker => (
+                    {getHotspotAreas && hotspotArray.map(marker => (
                       <Marker
                         key={marker.localityId}
                         position={{ lat: marker.latitude, lng: marker.longitude }}
@@ -1373,7 +1519,7 @@ function Report(props) {
                       />
                     ))}
 
-                    {getHotspotAreas && activeMarker && getHotspotAreas?.map(marker => (
+                    {getHotspotAreas && activeMarker && hotspotArray.map(marker => (
                       <InfoWindow
                         key={marker.localityId}
                         position={{ lat: activeMarker.latitude, lng: marker.longitude }}
@@ -1387,14 +1533,29 @@ function Report(props) {
                     ))}
                   </Map>
                   {area != null ? (
-                    <span className={`bg-[#F3EDE8] text-gray-800 h-[64vh] p-2 pb-4 gandhi-family rounded-b-xl`}
-                      style={{ display: 'flex', alignItems: 'end', letterSpacing: '0.05em', fontFamily: '"Gandhi Sans Regular"' }}>
-                      {" "}
-                      {"Area: "}{parseFloat(roundToTwoDecimals(area))} square kilometers
-                    </span>
+                    <div
+  style={{
+    position: "absolute",
+    bottom: 12,
+    left: 12,
+    background: "rgba(255,255,255,0.88)",
+    border: "1px solid #d6d6d6",
+    borderRadius: "6px",
+    padding: "6px 10px",
+    fontSize: "12px",
+    fontFamily: '"Gandhi Sans Regular", Arial, sans-serif',
+    color: "#333",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+    zIndex: 1000,
+  }}
+>
+  <span style={{ fontWeight: 600 }}>Area:</span>{" "}
+  {roundToTwoDecimals(area).toLocaleString()} km²
+</div>
                   ) : (
                     ""
                   )}
+                </div>
                 </div>
                 <div className="ml-2 mt-8 md:mt-0 ">
                   {" "}
@@ -1425,7 +1586,7 @@ function Report(props) {
                   i
                 </button> */}
                   <Tooltip
-                    title="Intensity of the colour of a grid is proportional to the number of checklists from that grid"
+                    title="Intensity of the colour of a grid is proportional to the number of checklists from that grid. Hover on grid (lat x lng x normalized checklist (%)) "
                     placement="top"
                     arrow
                     enterTouchDelay={0} // show immediately on tap
@@ -1452,43 +1613,57 @@ function Report(props) {
                 onMapReady={onMapReady} 
                 isPolygon={editedData?true:false} 
                 stateName={stateName} 
-                paths={boundaryData  || editedData || convertedData || newBufferdata || formattedData} 
+                /*
+                paths={
+                  boundaryData
+                    ? boundaryData
+                    : props.allEditedData?.length > 0
+                      ? props.allEditedData
+                      : convertedData || newBufferdata || formattedData
+                }
+                      */
+                paths={
+  allFeaturePolygons?.length > 0
+    ? allFeaturePolygons
+    : boundaryData
+      ? boundaryData
+      : props.allEditedData?.length > 0
+        ? props.allEditedData
+        : convertedData || newBufferdata || formattedData
+}
+     
                 setPolygonsCount={setPolygonsCount}
                 bufferData={props.bufferData}
                 orgPolyCoords={props.orgPolyCoords} 
-                mapBoundary={boundaryData  || convertedData || editedData || formattedData}
+                /*mapBoundary={boundaryData  || convertedData ||   props.allEditedData || formattedData}*/
+                mapBoundary={
+  allFeaturePolygons?.length > 0
+    ? allFeaturePolygons
+    : boundaryData ||
+      convertedData ||
+      props.allEditedData ||
+      formattedData
+}
                 newPolygon={props.newPolygon}
               />
               <div>
                 <div className="bottom-0 left-0 w-full flex justify-center items-center bg-white mt-[10px]">
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="  w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#562377] border border-black mr-2"></div>
-                    <span className="text-xs">{'>= 70'}</span>
-                  </div>
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#3949ab] border border-black mr-2"></div>
-                    <span className="text-xs">{'30 - 69'}</span>
-                  </div>
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#5c6bc0] border border-black mr-2"></div>
-                    <span className="text-xs">{'10 - 29'}</span>
-                  </div>
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#7986cb] border border-black mr-2"></div>
-                    <span className="text-xs">{'3 - 9'}</span>
-                  </div>
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#c5cae9] border border-black mr-2"></div>
-                    <span className="text-xs">{'1 - 2'}</span>
-                  </div>
-                  <div className="flex items-center mx-1 md:mx-2 lg:mx-2 xlg:mx-2">
-                    <div className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 xlg:w-8 xlg:h-8 bg-[#FFFFFF] border border-black mr-2"></div>
-                    <span className="text-xs">{'0'}</span>
-                  </div>
+                  {HEATMAP_CLASSES.map(item => (
+                    <div
+                      key={item.label}
+                      className="flex items-center mx-1 md:mx-2 lg:mx-2"
+                    >
+                      <div
+                        className="w-4 h-4 md:w-8 md:h-8 lg:w-8 lg:h-8 border border-black mr-2"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-xs">{item.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             <div className="text-center text-3xl  gandhi-family text-[20px]  mt-[5px]">
-             PERCENTAGE OF COMPLETE LISTS (Total={highestNumber})
+             COMPLETE CHECKLISTS INTENSITY (Maximum grid count = {highestNumber})
             </div>
             </div>
             </div>
@@ -1499,9 +1674,7 @@ function Report(props) {
               <Chart mapZoomOut={mapZoomOut}/>
             </div>
 
-            {}
-            {}
-
+            
             <div className="p-1 lg:px-8 mt-8 text-xs lg:text-base mb-4">
               <Card className="md:mx-5 lg:mx-40">
                 <div>
@@ -1654,22 +1827,26 @@ function Report(props) {
           className="px-4 text-right gandhi-family flex justify-end items-center"
           style={{ gap: "8px" }}
         >
-          <button
-            disabled={!getCountByScientificName?.total}
-            onClick={() => {
-              setChangeLayoutForReport(true);
-            }}
-            className="min-w-[145px] px-4 py-2 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
-          >
-            {pdfDownloadStatus}
-          </button>
+ 
+  {reportReady && (
+    <button
+      onClick={handleDownloadClick}
+      className={buttonEnabled}
+    >
+      <FileDownloadOutlinedIcon fontSize="small" />
+      <span>Download PDF</span>
+    </button>
+  )}
 
-          <button
-            onClick={downloadDataPackage}
-            className="min-w-[145px] px-4 py-2 bg-white-50 outline-none border border-indigo-100 rounded text-indigo-500 font-medium hover:bg-[#DAB830] hover:text-white transition-colors duration-200"
-          >
-            Download Data
-          </button>
+  {reportReady && (
+    <button
+      onClick={downloadDataPackage}
+      className={buttonEnabled}
+    >
+      <FileDownloadOutlinedIcon fontSize="small" />
+      <span>Download Data</span>
+    </button>
+  )}
         </div>
       </div>
 

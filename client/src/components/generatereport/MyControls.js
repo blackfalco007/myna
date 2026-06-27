@@ -87,12 +87,27 @@ import * as turf from "@turf/turf";
 import L from "leaflet";
 
 function MyControls({_onCreate, _onDeleted, data, newPolygon, setArea, uploadedgeojson, bufferData}) {
+    const lastCreateRef = useRef("");
     const map = useMap();
 
 
     const createShapeEvent = (e) => {
        
-      
+       const signature = JSON.stringify(
+            e.layer._latlngs
+        );
+
+        if (lastCreateRef.current === signature) {
+            console.log("duplicate create ignored");
+            return;
+        }
+
+        lastCreateRef.current = signature;
+
+        setTimeout(() => {
+            lastCreateRef.current = "";
+        }, 1000);
+
       const coordinates = e.layer._latlngs;
       const coordinatesForFile = [
           coordinates[0].map((point) => [point.lng, point.lat]),
@@ -108,6 +123,7 @@ function MyControls({_onCreate, _onDeleted, data, newPolygon, setArea, uploadedg
       // Validate area
       const area = getAreaOfPolygon(coordinatesForFile[0]) / 1000000;
       setArea(area);
+      
       if (area > 50000) {
         toast.error("Selected Area should be less than 50,000 Square Kilometers")
         map.eachLayer((layer) => {
@@ -117,7 +133,7 @@ function MyControls({_onCreate, _onDeleted, data, newPolygon, setArea, uploadedg
         });
         return
       }
-  
+
       _onCreate(e);
   };
   

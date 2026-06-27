@@ -13,30 +13,55 @@ function  Ziptogeojson(props) {
     const map = useMap();
     if (props.isZoomRequired) {
       map.invalidateSize();
-      const geometry = props.data.features[0].geometry;
-      const geoType = geometry.type;
+      const bounds = [];
 
-      let arrayOfCords;
-      if (geoType === 'Polygon') {
-        // For Polygon, use coordinates[0]
-        arrayOfCords = geometry.coordinates[0];
-      } else if (geoType === 'MultiPolygon') {
-        // For MultiPolygon, use coordinates[0][0]
-        arrayOfCords = geometry.coordinates[0][0];
-      } else {
-        console.error("Unsupported GeoJSON type:", geoType);
-      } 
-      const centroid = calculateCentroid(arrayOfCords);
-      const zoom = calculateZoom(arrayOfCords);
-      const area =getAreaOfPolygon(arrayOfCords)/1000000
-      console.log(">>>>",area)
+props.data?.features?.forEach(feature => {
 
-      props.setArea(area)
-      if(area>50000)
-      {
-        return toast.error("Selected Area should be less than 50,000 Square Kilometers")
-      }
-      map.flyTo(centroid, zoom);
+  const geometry = feature.geometry;
+
+  if (geometry?.type === "Polygon") {
+
+    geometry.coordinates.forEach(ring => {
+      ring.forEach(coord => {
+        bounds.push([coord[1], coord[0]]);
+      });
+    });
+
+  } else if (geometry?.type === "MultiPolygon") {
+
+    geometry.coordinates.forEach(poly => {
+      poly.forEach(ring => {
+        ring.forEach(coord => {
+          bounds.push([coord[1], coord[0]]);
+        });
+      });
+    });
+
+  }
+
+});
+
+if (bounds.length > 0) {
+
+  const area =
+    getAreaOfPolygon(bounds.map(([lat, lng]) => ({
+      latitude: lat,
+      longitude: lng
+    }))) / 1000000;
+
+  props.setArea(area);
+
+  
+  if (area > 50000) {
+    return toast.error(
+      "Selected Area should be less than 50,000 Square Kilometers"
+    );
+  }
+
+  if (bounds.length > 0) {
+  map.flyToBounds(bounds);
+  }
+}
       props.setIsZoomRequired(false);
     }
 

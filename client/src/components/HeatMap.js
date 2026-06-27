@@ -1,10 +1,10 @@
  //workingggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
 /* global google */
- import React, { useEffect, useState, useMemo } from 'react';
+ import React, { useEffect, useState, useMemo} from 'react';
  import { Map, Marker,Polygon, GoogleApiWrapper,InfoWindow } from 'google-maps-react';
  import { useSelector } from 'react-redux';
  import * as turf from '@turf/turf';
- import { calculateRoundedValue, HEATMAP_GRID_SIZE} from "./generatereport/helpers/heatmapUtils";
+ import { calculateRoundedValue, HEATMAP_GRID_SIZE, getHeatmapStyle } from "./generatereport/helpers/heatmapUtils";
  
  const center = { lat: 21.1458, lng: 79.0882 };
  
@@ -23,13 +23,8 @@
    const roundToTwoDecimals = (num) => Math.round(num * 1000) / 1000;
 
   
-//  console.log("hoveredCoords",hoveredCoords);
-  
-  // console.log("data.paths",data.paths);
-  // console.log("bufferDatahmap",data.bufferData)
    useEffect(()=>{
      data.setPolygonsCount(polyCount);
-    //  console.log("polyCount",polyCount);
    },[polyCount])
 
   //  console.log("uniqueIdentifiersCount",uniqueIdentifiersCount)
@@ -137,37 +132,6 @@ const longitudes = flattenedPaths.map(p => p.lng).filter(x => typeof x === 'numb
         (gridBounds.lngMax - gridBounds.lngMin) / 10
       );
     }
-   
-    // console.log("data.isPolygon",data.isPolygon);
-
-   const getColorAndOpacity = (hotspot) => {
-    let color, fillOpacity;
-  // console.log("hotspot",hotspot);
-
-
-    if (hotspot >= 70) {
-      color = '#562377'; // Deep Purple-Blue
-      fillOpacity = 0.8;
-    } else if (hotspot >= 30 && hotspot < 70) {
-      color = '#3949ab'; // Medium Blue
-      fillOpacity = 0.8;
-    } else if (hotspot >= 10 && hotspot < 30) {
-      color = '#5c6bc0'; // Soft Blue 
-      fillOpacity = 0.8;
-    } else if (hotspot >= 1 && hotspot < 10) {
-      color = '#7986cb'; // Light Blue
-      fillOpacity = 0.8;
-    } else if (hotspot <= 0)  {
-      color = 'transparent'; // Fully transparent
-      fillOpacity = 0;
-    }
-  
-    return { color, fillOpacity };
-  };
-  
- 
- 
-
 
 const isPointInPolygon = (point, polygon) => {
   if (!polygon || polygon.length === 0) return false;
@@ -212,14 +176,49 @@ const clipPolygonToBoundary = (square, polygonBoundary) => {
     }
 
     if (isCurrentInside !== isNextInside) {
-      const intersection = getIntersectionPoint(currentPoint, nextPoint, polygonBoundary);
-      if (intersection) clippedPolygon.push(intersection);
+      const intersection = getIntersectionPoint(
+          currentPoint,
+          nextPoint,
+          polygonBoundary
+        );
+
+        if (intersection) {
+          clippedPolygon.push(intersection);
+        }
+      }
     }
+
+  // Remove consecutive duplicate points
+  const uniquePoints = clippedPolygon.filter((point, index, arr) => {
+    if (index === 0) return true;
+
+    return !(
+      point.lat === arr[index - 1].lat &&
+      point.lng === arr[index - 1].lng
+    );
+  });
+
+  // Need at least 3 vertices
+  if (uniquePoints.length < 3) {
+    return [];
   }
 
-  return clippedPolygon;
-};
+  // Close the polygon if not already closed
+  const first = uniquePoints[0];
+  const last = uniquePoints[uniquePoints.length - 1];
 
+  if (
+    first.lat !== last.lat ||
+    first.lng !== last.lng
+  ) {
+    uniquePoints.push({
+      lat: first.lat,
+      lng: first.lng
+    });
+  }
+
+  return uniquePoints;
+};
 
 
 
@@ -227,7 +226,6 @@ const getIntersectionPoint = (p1, p2, polygon) => {
   for (let i = 0; i < polygon.length; i++) {
     const pA = polygon[i];
     const pB = polygon[(i + 1) % polygon.length];
-
     const intersection = lineIntersection(p1, p2, pA, pB);
     if (intersection) return intersection;
   }
@@ -250,93 +248,177 @@ const lineIntersection = (A, B, C, D) => {
 };
 
 
+const pointInBoundary = (lat, lng, boundaryFeatures) => {
+  const point = turf.point([lng, lat]);
 
-   
- 
-   const generateGrid = useMemo(() => {
+  for (const boundaryFeature of boundaryFeatures) {
+    if (turf.booleanPointInPolygon(point, boundaryFeature)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const generateGrid = useMemo(() => {
     try {
       const polygons = [];
-      const latStart = gridBounds.latMin ;
-      const latEnd = gridBounds.latMax  ;
-      const lngStart = gridBounds.lngMin  ;
-      const lngEnd = gridBounds.lngMax ;
- 
- 
- 
-      if (latStart === 0 && latEnd === 0 && lngStart === 0 && lngEnd === 0) {
-        return []; 
+
+      if (!maxValue || Object.keys(uniqueIdentifiersCount).length === 0) {
+        setPolyCount(0);
+        return [];
       }
-    
-  
-      // const latStep = calculateRoundedValue(gridStepSize / 111);
-      // const lngStep = calculateRoundedValue(gridStepSize / (111 * Math.cos((latStart + latEnd) / 2 * (Math.PI / 180))));
-      const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 
-      const latStep = clamp(calculateRoundedValue(dynamicStepSize), 0.005, 0.05);
-      const lngStep = clamp(calculateRoundedValue(dynamicStepSize), 0.005, 0.05);
-      // const latStep = clamp(calculateRoundedValue(dynamicStepSize), 0.027, 0.05);
-      // const lngStep = clamp(calculateRoundedValue(dynamicStepSize), 0.027, 0.05);
-// console.log("latStep,lngStep",latStep,lngStep);
-// console.log("Lat Steps:", (latEnd - latStart) / latStep);
-// console.log("Lng Steps:", (lngEnd - lngStart) / lngStep);
+      const polygonsToClipAgainst = Array.isArray(data.paths?.[0])
+        ? data.paths
+        : data.paths
+          ? [data.paths]
+          : [];
 
-    
-      let polygonCount = 0; // Track number of polygons
-      let keyCount = 0;
-      let prevKey = null; // <-- track previous key here
+      const boundaryFeatures = polygonsToClipAgainst
+        .map(poly => {
+          const coords = poly
+            .map(p => [
+              typeof p.lng === 'function' ? p.lng() : p.lng,
+              typeof p.lat === 'function' ? p.lat() : p.lat
+            ])
+            .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
 
-      for (let lat = latStart; lat <= latEnd; lat += latStep) {
-        for (let lng = lngStart; lng <= lngEnd; lng += lngStep) {
-          keyCount = keyCount+1
-          const roundedLat = calculateRoundedValue(lat);
-          const roundedLng = calculateRoundedValue(lng);
-      
-          const nextLat = Math.min(lat + latStep, latEnd);
-          const nextLng = Math.min(lng + lngStep, lngEnd);
-  
-          // Construct the rectangular polygon
-          const polygonCoords = [
-            { lat, lng },  
-            { lat: nextLat, lng },  
-            { lat: nextLat, lng: nextLng }, 
-            { lat, lng: nextLng },  
-            { lat, lng }  
-          ];
-  
+          if (coords.length < 3) return null;
 
-          // console.log("polygonCoords",polygonCoords)
-        
-      
-          
-          const insideCorners = polygonCoords.filter(coord => isPointInPolygon(coord, data.paths));
-      
-          if (insideCorners.length === 0) {
-            continue;
+          if (
+            coords[0][0] !== coords[coords.length - 1][0] ||
+            coords[0][1] !== coords[coords.length - 1][1]
+          ) {
+            coords.push([...coords[0]]);
           }
-      
-          let finalPolygonCoords = polygonCoords;
-          if (insideCorners.length < polygonCoords.length) {
-            // If partially inside, clip the square
-            finalPolygonCoords = clipPolygonToBoundary(polygonCoords, data.paths);
-          }
-      
-          const latLngKey = `${roundedLat}X${roundedLng}`;
-          // console.log("latLngKey",latLngKey)
-          const hotspot = uniqueIdentifiersCount[latLngKey] || 0;
-          const normalizedHotspot = Math.ceil((hotspot * 100) / (maxValue || 1));
-          const { color, fillOpacity } = getColorAndOpacity(normalizedHotspot);
-          const currentKey = `${roundedLat}-${roundedLng}-${normalizedHotspot}`;
 
-          const polygon = (
+          const lngs = coords.map(([lng]) => lng);
+          const lats = coords.map(([, lat]) => lat);
+
+          return {
+            feature: turf.polygon([coords]),
+            bbox: {
+              minLng: Math.min(...lngs),
+              maxLng: Math.max(...lngs),
+              minLat: Math.min(...lats),
+              maxLat: Math.max(...lats)
+            }
+          };
+        })
+        .filter(Boolean);
+
+      Object.entries(uniqueIdentifiersCount).forEach(([latLngKey, hotspot], polygonCount) => {
+        const [latStr, lngStr] = latLngKey.split("X");
+        const lat = Number(latStr);
+        const lng = Number(lngStr);
+
+        if (
+          !Number.isFinite(lat) ||
+          !Number.isFinite(lng) ||
+          !Number.isFinite(hotspot)
+        ) {
+          return;
+        }
+
+        const normalizedHotspot = Math.ceil((hotspot * 100) / (maxValue || 1));
+        if (normalizedHotspot <= 0) {
+          return;
+        }
+
+        const nextLat = lat + HEATMAP_GRID_SIZE;
+        const nextLng = lng + HEATMAP_GRID_SIZE;
+        const polygonCoords = [
+          { lat, lng },
+          { lat: nextLat, lng },
+          { lat: nextLat, lng: nextLng },
+          { lat, lng: nextLng },
+          { lat, lng }
+        ];
+
+        let polygonPaths = [polygonCoords];
+
+        if (boundaryFeatures.length > 0) {
+          const candidateBoundaries = boundaryFeatures.filter(({ bbox }) =>
+            bbox.minLng <= nextLng &&
+            bbox.maxLng >= lng &&
+            bbox.minLat <= nextLat &&
+            bbox.maxLat >= lat
+          );
+
+          if (candidateBoundaries.length === 0) {
+            return;
+          }
+
+          const allCornersInside = polygonCoords.slice(0, 4).every(coord =>
+            candidateBoundaries.some(({ feature }) =>
+              turf.booleanPointInPolygon(turf.point([coord.lng, coord.lat]), feature)
+            )
+          );
+
+          if (!allCornersInside) {
+            const squareFeature = turf.polygon([[
+              [lng, lat],
+              [nextLng, lat],
+              [nextLng, nextLat],
+              [lng, nextLat],
+              [lng, lat]
+            ]]);
+
+            const clippedPaths = [];
+
+            candidateBoundaries.forEach(({ feature }) => {
+              const clipped = turf.intersect(
+                turf.featureCollection([
+                  squareFeature,
+                  feature
+                ])
+              );
+
+              if (!clipped) return;
+
+              if (clipped.geometry.type === "Polygon") {
+                clippedPaths.push(
+                  clipped.geometry.coordinates[0].map(
+                    ([lng, lat]) => ({ lat, lng })
+                  )
+                );
+              } else if (clipped.geometry.type === "MultiPolygon") {
+                clipped.geometry.coordinates.forEach(poly => {
+                  clippedPaths.push(
+                    poly[0].map(
+                      ([lng, lat]) => ({ lat, lng })
+                    )
+                  );
+                });
+              }
+            });
+
+            if (clippedPaths.length === 0) {
+              return;
+            }
+
+            polygonPaths = clippedPaths;
+          }
+        }
+
+        const { color, fillOpacity } = getHeatmapStyle(normalizedHotspot);
+
+        polygonPaths.forEach((path, pathIndex) => {
+          polygons.push(
             <Polygon
-              key={`${roundedLat}-${roundedLng}-${polygonCount}-${normalizedHotspot}`}
-              paths={finalPolygonCoords}
-              strokeColor="#000000"
-              strokeWeight={0.3}
+              key={`${latLngKey}-${polygonCount}-${pathIndex}-${normalizedHotspot}`}
+              paths={path}
+              strokeColor="#666666"
+              strokeWeight={0.15}
+              strokeOpacity={0.3}
               fillColor={color}
               fillOpacity={fillOpacity}
               onMouseover={() => {
-                setHoveredCoords({ lat: roundedLat, lng: roundedLng, latLngString: `${roundedLat} X ${roundedLng} & ${normalizedHotspot}%`});
+                setHoveredCoords({
+                  percentage: normalizedHotspot,
+                  gridId: latLngKey
+                });
               }}
               onMouseout={() => {
                 setHoveredCoords(null);
@@ -344,22 +426,15 @@ const lineIntersection = (A, B, C, D) => {
               zIndex={10000}
             />
           );
-      
-          polygons.push(polygon);
-          prevKey = currentKey; // <-- update previous key here
-          polygonCount++;
-        }
-        // if (polygonCount > 1000) break;
-      }
-      setPolyCount(polygonCount);
+        });
+      });
+
+      setPolyCount(polygons.length);
       return polygons;
     } catch (error) {
     }
-    
-   }, [gridBounds, dynamicStepSize, props.paths,values,maxValue,data.paths]);
+   }, [uniqueIdentifiersCount, maxValue, data.paths]);
 
-
- 
      const [showInfoWindow, setShowInfoWindow] = useState(false);
      const [activeMarker, setActiveMarker] = useState(null);
      const handleMarkerClick = (marker) => {
@@ -500,30 +575,20 @@ const lineIntersection = (A, B, C, D) => {
         };
       };
       
-       const createBuffer = (geojson, radius, units = 'kilometers') => {
+        const createBuffer = (geojson, radius, units = 'kilometers') => {
         const data =  convertLeafletPolygonToGeoJSON(geojson);
-          // console.log("geojson in reportmap buffer",geojson)
-          // const buffered = turf.buffer(data, 0, { units }); 
-          // console.log("buffered",buffered)
-          // console.log("buffered.geometry.coordinates[0]",data.geometry.coordinates[0])
-          const coordData = normalizeBoundaryCoords2(data.geometry.coordinates[0]);
-          // console.log("coordData",coordData) 
-        //  const detailedCoords = interpolateCoordinates(coordData, 200);
-        //  console.log("detailedCoords",detailedCoords);
-          // return detailedCoords ;
-          return coordData;
+        const coordData = normalizeBoundaryCoords2(data.geometry.coordinates[0]);
+        return coordData;
         };
 
      
 
       function getArea(coords) {
-        // console.log("coords",coords);
         if(coords.length>0 || coords.length != null){
           let area = 0;
           for (let i = 0, len = coords.length; i < len - 1; i++) {
             area += (coords[i].lng * coords[i + 1].lat) - (coords[i + 1].lng * coords[i].lat);
           }
-          // console.log("area/2area/2",area/2)
           return area / 2;
         }
       }
@@ -539,24 +604,15 @@ const lineIntersection = (A, B, C, D) => {
         return getArea(coords) < 0 ? coords : [...coords].reverse();
         }
       }
-      
-
-        
-      
-    // console.log("normalizeBoundaryCoords(data.mapBoundary)",normalizeBoundaryCoords(data.mapBoundary))
-   return (
+    return (
      
- <div className="map-container flex justify-between items-start h-[70vh] w-[91vw] md:w-[70vw] lg:w-[70vw] xlg:w-[70vw] md:ml-0 lg:ml-0">
+ <div className="relative map-container flex justify-between items-start h-[70vh] w-[91vw] md:w-[70vw] lg:w-[70vw] xlg:w-[70vw] md:ml-0 lg:ml-0">
  
       
         
        { gridBounds.latMin && gridBounds.lngMax && gridBounds.latMax && gridBounds.lngMin && maxValue &&
        <Map
          google={data.google}
-         initialCenter={{
-           lat: (gridBounds.latMin + gridBounds.latMax) / 2,
-           lng: (gridBounds.lngMin + gridBounds.lngMax) / 2
-         }}
           // onReady={!data.mapZoomOut &&  data.onMapReady}
           onReady={(mapProps, map) => {
             if (data.bufferData) {
@@ -568,24 +624,38 @@ const lineIntersection = (A, B, C, D) => {
                 strokeColor: '#4F9BC0'
               });
             }
-        
+            const bounds = new mapProps.google.maps.LatLngBounds();
+
+  if (Array.isArray(data.mapBoundary?.[0])) {
+
+    data.mapBoundary.forEach(poly => {
+      poly.forEach(pt => bounds.extend(pt));
+    });
+
+  } else {
+
+    data.mapBoundary.forEach(pt => bounds.extend(pt));
+
+  }
+
+  map.fitBounds(bounds, 30);
             // if (data.orgPolyCoords) {
             //   map.data.addGeoJson(data.orgPolyCoords); // if orgPolyCoords is valid GeoJSON
             // }
         
-            if (data.onMapReady && !data.mapZoomOut) {
-              data.onMapReady(mapProps, map);
-            }
+            //if (data.onMapReady && !data.mapZoomOut) {
+              //data.onMapReady(mapProps, map);
+            //}
           }}
-          zoom={8.5 }
          style={{
            height: "70vh",
            width: window.innerWidth >758 ? '70vw' : '91vw',
          }}
-         mapTypeControl={false}
+         zoomControl={true}
+         mapTypeControl={true}
          scaleControl={true}
          scaleControlOptions={{
-          position: data.google.maps.ControlPosition.BOTTOM_LEFT
+          position: data.google.maps.ControlPosition.TOP_RIGHT
         }}
          streetViewControl={false}
          panControl={false}
@@ -602,37 +672,27 @@ const lineIntersection = (A, B, C, D) => {
                fillOpacity={0}
              />
            )}
-          
-          <Polygon
- paths={[
-  Array.isArray(newBufferdata) ? ensureClockwise(newBufferdata) : [],
-  ensureCounterClockwise(
-    data.newPolygon
-      ? createBuffer(data.newPolygon)
-      : interpolateCoordinates(normalizeBoundaryCoords(data.mapBoundary))
-  )
-]}
-  strokeColor="#4F9BC0"
-  strokeOpacity={1}
-  strokeWeight={1}
-  fillColor="#c5cae9"  // Light blue
-  fillOpacity={1}
-/>
-
          {generateGrid}
-           <InfoWindow                             
-           visible={hoveredCoords?.latLngString ? true : false}
-
-            position={{ lat: Number(hoveredCoords?.lat), lng: Number(hoveredCoords?.lng) }}
-    
-           >
-             <div style={{zIndex:'1000'}}>
-             <p>{hoveredCoords?.latLngString}</p>
-             </div>
-           </InfoWindow>    
+          
        </Map>
        
        }
+
+        {hoveredCoords && (
+            <div
+              className="absolute top-3 right-3 bg-white rounded-md shadow-lg px-3 py-2 z-50 pointer-events-none"
+            >
+              <div className="text-lg font-bold leading-none">
+                {hoveredCoords.percentage}%
+              </div>
+
+              <div className="text-[10px] text-gray-600 mt-1">
+                Grid {hoveredCoords.gridId}
+              </div>
+            </div>
+          )}   
+
+
      </div>
    );
  }

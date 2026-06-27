@@ -149,10 +149,8 @@ export const calculateZoom = (points) => {
         lat: latSum / totalPoints,
         lng: lngSum / totalPoints,
       };
-      console.log('manualCenter',manualCenter);
       return manualCenter;
     }
-    console.log( {lat: centerLat, lng: centerLng});
     return { lat: centerLat, lng: centerLng };
   }
 

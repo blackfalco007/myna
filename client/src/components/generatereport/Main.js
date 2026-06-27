@@ -66,6 +66,52 @@ import { useDrawing } from "./contexts/Mapcontext";
 
 const drawerWidth = 360;
 const windowWidth = window.innerWidth;
+
+function closePolygonRing(ring) {
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+
+  if (
+    first[0] !== last[0] ||
+    first[1] !== last[1]
+  ) {
+    ring.push([...first]);
+  }
+
+  return ring;
+}
+
+// Normalize imported GeoJSON from external libraries.
+//
+// Some importers (e.g. KML, Shapefile) may produce Polygon or
+// MultiPolygon rings that are not explicitly closed.
+// GeoJSON requires LinearRings to repeat the first coordinate as
+// the last coordinate. Normalize here so the rest of the application
+// always works with valid GeoJSON.
+function normalizeGeoJSON(geojson) {
+
+  geojson.features.forEach(feature => {
+
+    if (feature.geometry.type === "Polygon") {
+
+      feature.geometry.coordinates =
+        feature.geometry.coordinates.map(closePolygonRing);
+
+    } else if (feature.geometry.type === "MultiPolygon") {
+
+      feature.geometry.coordinates =
+        feature.geometry.coordinates.map(poly =>
+          poly.map(closePolygonRing)
+        );
+
+    }
+
+  });
+
+  return geojson;
+}
+
+
 function Main(props) {
 
   const {
@@ -108,38 +154,61 @@ function Main(props) {
   const [mediumForReport, setMediumForReport] = useState(null);
   const [geoJson, setGeoJson] = useState(null);
   const [Finaldata, setFinaldata] = useState([]);
+  /* User selected */
   const [selectedState, setSelectedState] = useState("");
   const [selectedCounty, setSelectedCounty] = useState("");
   const [selectedLocality, setSelectedLocality] = useState("");
+  const [districtList, setDistrictList] = useState([]);
+  const [localitiesList, setLocalitiesList] = useState([]);
+  
   const [selectedLocalityCoords, setSelectedLocalityCoords] = useState(null);
+  
   const [showGeographySign, setShowGeographySign] = useState(false);
   const [showUploadFileComponent, setShowUploadFileComponent] = useState(false);
   const [newPolygon, setNewPolygon] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [showInstructionModal, setShowInstructionModal] = useState(false);
   const [isZoomRequired, setIsZoomRequired] = useState(true);
-  const [districtList, setDistrictList] = useState([]);
-  const [localitiesList, setLocalitiesList] = useState([]);
   const [editedData, setEditedData] = useState(null);
   const [value, setValue] = useState(null); //using state since its now in json
   const [value2, setValue2] = useState(null); //using state since its now in json
   const [showdate, setShowdate] = useState(true);
   const [area, setArea] = useState(null)
+  
+  /* These drive the map */
   const [boundary, setBoundary] = useState(null);
-  const [stateBoundary, setStateBoundary] = useState(null);
-  // const [districtBoundary, setDistrictBoundary] = useState(null);
   const [isStateData, setIsStateData] = useState(false);
   const [statesJsonData,setStatesJsonData] = useState({});
   const [districtJsonData,setDistrictJsonData] = useState({});
+  
+  const [stateBoundary, setStateBoundary] = useState(null);
   const { setStartPolygonDrawing } = useDrawing();
+  
+  
   const latestBoundaryRequest = useRef(0);
   const [bufferData, setBufferData] = useState(null);
   const [orgPolyCoords, setOrgPolyCoords] = useState(null);
   //Below 3 are now pulled from json files (created at the time of dbRefresh - End-date and updated localities every month) 
   const [statesList, setStatesList] = useState([]);
-  const [district, setDistrict] = useState([]);
+  const [geographyHierarchy, setGeographyHierarchy] = useState([]);
   const [runtimeConfig, setRuntimeConfig] = useState(null);
   
+  //Feature - predefined layers
+  const [category, setCategory] =
+    useState("administrative");
+
+  const [areaType, setAreaType] =
+    useState("district");
+
+  const [areaList, setAreaList] =
+    useState([]);
+
+  const [selectedArea, setSelectedArea] =
+    useState("");
+
+  const [allFeatures, setAllFeatures] = useState([]);
+  const [allEditedData, setAllEditedData] = useState([]);
+
   const handleMouseLeave = () => {
     setAnchorEl(null);
   };
@@ -147,7 +216,6 @@ function Main(props) {
     handleGeographyClick("Upload Button");
     setShowUploadFileComponent(payload);
   };
-// console.log('uploadedFileNameuploadedFileName',uploadedFileName);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
   const [showreport, setShowreport] = useState(false);
@@ -161,15 +229,14 @@ function Main(props) {
     setSelectedState(e.target.value);
     setSelectedCounty("");
 
-    const filteredState = district.find(
+    const filteredState = geographyHierarchy.find(
       (item) => item.state === e.target.value
     );
-    setDistrictList(filteredState.districts);
+    setDistrictList(filteredState?.districts || []);
   };
 
 
-  // console.log('selectedState',selectedState)
-
+  
   const handleSelectCounty = (e) => {
 
     setSelectedLocality("");
@@ -193,7 +260,6 @@ function Main(props) {
       item => item.name === e.target.value
     );
 
-    console.log("Selected locality:", localityObj);
     setSelectedLocalityCoords({
       lat: localityObj.lat,
       lon: localityObj.lon
@@ -224,7 +290,6 @@ function Main(props) {
   const [uploadedgeojson, setUploadedgeojson] = React.useState(null);
   const { window } = props;
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  // const mapRef = useRef();
 
 
   useEffect(() => {
@@ -242,7 +307,6 @@ function Main(props) {
       setStartPolygonDrawing(true)
     }
   };
-  // console.log('uploadedgeojson',uploadedgeojson);
 
   const formattedStartDate = formatDateToMMDDYYYY(value);
   const formattedEndDate = formatDateToMMDDYYYY(value2);
@@ -481,7 +545,6 @@ function Main(props) {
       formattedStartDate,
       formattedEndDate
     );
-
     GET_SOIB_CONCERN_STATUS(
       uploadedgeojson || newPolygon
         ? formData
@@ -532,6 +595,7 @@ function Main(props) {
         reader.onload = function (buffer) {
           shp(buffer.target.result).then(function (data) {
             if (data) {
+              normalizeGeoJSON(data); 
               setUploadedgeojson(data);
             } else {
               toast.error("No data in file");
@@ -569,6 +633,8 @@ function Main(props) {
       const text = await file.text();
       const kml = new DOMParser().parseFromString(text, "text/xml");
       const geojson = togeojson.kml(kml);
+      normalizeGeoJSON(geojson);
+      
       if (geojson) {
         setUploadedgeojson(geojson);
       } else {
@@ -647,6 +713,7 @@ function Main(props) {
 
 
   useEffect(() => {
+    const requestId = ++latestBoundaryRequest.current;
     const getData = async () => {
       try {
         const response = await api.get('users/geojson/states', {
@@ -654,6 +721,9 @@ function Main(props) {
             state: selectedState
           }
         });
+        if (requestId !== latestBoundaryRequest.current) {
+        return;
+        }
         // console.log(response.data);
         setStatesJsonData(response.data);
       } catch (error) {
@@ -720,7 +790,7 @@ function Main(props) {
     // console.log('statesJsonData updated:', statesJsonData);
 
     try {
-      if (selectedState && statesJsonData && Object.keys(statesJsonData).length > 0) {
+      if (selectedState && !selectedCounty && statesJsonData && Object.keys(statesJsonData).length > 0) {
         setIsStateData(true); 
         
         // console.log('Processed statesJsonData:', statesJsonData);
@@ -802,7 +872,7 @@ function Main(props) {
 
         setStatesList(data.statesList || []);
 
-        setDistrict(data.district || []);
+        setGeographyHierarchy(data.district || []);
 
         // runtime config now comes from SAME file
 
@@ -1299,6 +1369,7 @@ useEffect(() => {
   );
   const container =
     window !== undefined ? () => window().document.body : undefined;
+    
   return (
     <>
       {/* <ThemeProvider theme={themeOne}> */}
@@ -1327,6 +1398,7 @@ useEffect(() => {
           setUploadedFileName={setUploadedFileName}
           newPolygon={newPolygon}
           editedData={editedData}
+          allEditedData={allEditedData}
           setEditedData={setEditedData}
           setIsZoomRequired={setIsZoomRequired}
           startDate={value}
@@ -1441,6 +1513,9 @@ useEffect(() => {
               setArea={setArea}
               setMediumForReport={setMediumForReport}
               uploadedgeojson={uploadedgeojson}
+              allFeatures={allFeatures}
+              setAllFeatures={setAllFeatures}
+              setAllEditedData={setAllEditedData}
             />
           </Box>
         </Box>

@@ -219,9 +219,26 @@
   font-family: "Gandhi Sans Bold";
   font-weight: 700;
 }
-
+/*
 .gmnoprint a, .gmnoprint span, .gm-style-cc {
   display: none;
+}
+*/
+/* Keep Google attribution and scale visible */
+.gm-style-cc,
+.gmnoprint {
+  display: block !important;
+}
+
+
+/* Optional: hide fullscreen button 
+button.gm-control-active.gm-fullscreen-control {
+  display: none !important;
+}*/
+
+button[aria-label="Keyboard shortcuts"],
+button[title="Keyboard shortcuts"] {
+  display: none !important;
 }
 
 .baseClass{
@@ -351,7 +368,9 @@
 
 /* google maps  */
 
+
 .gm-style a{
   display: none !important;
 }
+
 /* *********************** */

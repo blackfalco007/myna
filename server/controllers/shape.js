@@ -4,6 +4,11 @@ const Sequelize = require("sequelize");
 const { Op } = require("sequelize");
 const path = require("path");
 const shpjs = require("shpjs");
+const buildSpatialFilter =
+        require(
+          "../helper/buildSpatialFilter"
+        );
+
 
 const UserController = {
   async count(req, res) {
@@ -13,10 +18,10 @@ const UserController = {
     }
     const buffer = fs.readFileSync(file.path);
     const geojson = await shpjs(buffer);
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const polygonText = `POLYGON((${polygonCoords
-      .map((point) => point.join(" "))
-      .join(", ")}))`;
+    const arr1 = [
+        buildSpatialFilter(geojson)
+    ];
+
     const categories = [
       "Vulnerable",
       "Critically Endangered",
@@ -29,220 +34,70 @@ const UserController = {
       distinct: "eBirdScientificName",
       where: {
         category: "species",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const soib = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         soibConcernStatus: "High",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const scheduleI = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         wpaSchedule: "Schedule-I",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const indiaEndemic = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         indiaEndemic: "Yes",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const highConcern = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         soibConcernStatus: "High",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const moderateConcern = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         soibConcernStatus: "Moderate",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const citesAppendixI = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         citesAppendix: "Appendix I",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const citesAppendixII = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         citesAppendix: "Appendix II",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const cmsAppendixI = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         cmsAppendix: "Appendix I",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const cmsAppendixII = await Kinnaur.count({
       distinct: "eBirdScientificName",
       where: {
         cmsAppendix: "Appendix II",
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     const migrate = await Kinnaur.count({
@@ -251,22 +106,7 @@ const UserController = {
         migratoryStatusWithinIndia: {
           [Op.notIn]: ["Resident", "Uncertain"],
         },
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
     });
     for (const category of categories) {
@@ -275,22 +115,8 @@ const UserController = {
         col: "eBirdScientificName",
         where: {
           iucnCategory: category,
-          [Sequelize.Op.and]: Sequelize.where(
-            Sequelize.fn(
-              "ST_Within",
-              Sequelize.fn(
-                "ST_SetSRID",
-                Sequelize.fn(
-                  "ST_MakePoint",
-                  Sequelize.col("longitude"),
-                  Sequelize.col("latitude")
-                ),
-                4326
-              ),
-              Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-            ),
-            true
-          ),
+          [Sequelize.Op.and]: arr1,
+            
           eBirdScientificName: Sequelize.where(
             Sequelize.fn(
               "regexp_replace",
@@ -350,10 +176,10 @@ const UserController = {
     }
     const buffer = fs.readFileSync(file.path);
     const geojson = await shpjs(buffer);
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const polygonText = `POLYGON((${polygonCoords
-      .map((point) => point.join(" "))
-      .join(", ")}))`;
+    const arr1 = [
+        buildSpatialFilter(geojson)
+    ];
+
     Kinnaur.findAll({
       attributes: [
         "iucnCategory",
@@ -369,22 +195,7 @@ const UserController = {
             "Endangered",
           ],
         },
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
       group: ["iucnCategory", "eBirdScientificName"],
       raw: true,
@@ -440,10 +251,6 @@ const UserController = {
     }
     const buffer = fs.readFileSync(file.path);
     const geojson = await shpjs(buffer);
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const polygonText = `POLYGON((${polygonCoords
-      .map((point) => point.join(" "))
-      .join(", ")}))`;
     Kinnaur.findAll({
       attributes: [
         "endemicRegion",
@@ -471,22 +278,7 @@ const UserController = {
             "Andaman Islands",
           ],
         },
-        [Sequelize.Op.and]: Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        [Sequelize.Op.and]: arr1
       },
       group: ["endemicRegion", "eBirdScientificName"],
       raw: true,
@@ -556,10 +348,10 @@ const UserController = {
     }
     const buffer = fs.readFileSync(file.path);
     const geojson = await shpjs(buffer);
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const polygonText = `POLYGON((${polygonCoords
-      .map((point) => point.join(" "))
-      .join(", ")}))`;
+    const arr1 = [
+        buildSpatialFilter(geojson)
+      ];
+
     try {
       const totalCount = await Kinnaur.count("eBirdScientificName");
 
@@ -573,22 +365,7 @@ const UserController = {
           ],
         ],
         where: {
-          [Sequelize.Op.and]: Sequelize.where(
-            Sequelize.fn(
-              "ST_Within",
-              Sequelize.fn(
-                "ST_SetSRID",
-                Sequelize.fn(
-                  "ST_MakePoint",
-                  Sequelize.col("longitude"),
-                  Sequelize.col("latitude")
-                ),
-                4326
-              ),
-              Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-            ),
-            true
-          ),
+          [Sequelize.Op.and]: arr1
         },
         group: ["eBirdScientificName", "eBirdEnglishName"],
         order: [[Sequelize.literal("count DESC")]],
@@ -620,10 +397,10 @@ const UserController = {
     }
     const buffer = fs.readFileSync(file.path);
     const geojson = await shpjs(buffer);
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const polygonText = `POLYGON((${polygonCoords
-      .map((point) => point.join(" "))
-      .join(", ")}))`;
+    const arr1 = [
+        buildSpatialFilter(geojson)
+    ];
+
     Kinnaur.count("eBirdScientificName")
       .then((count) => {
         totalCount = count;
@@ -638,22 +415,7 @@ const UserController = {
             migratoryStatusWithinIndia: {
               [Op.notIn]: ["Resident", "Uncertain"],
             },
-            [Sequelize.Op.and]: Sequelize.where(
-              Sequelize.fn(
-                "ST_Within",
-                Sequelize.fn(
-                  "ST_SetSRID",
-                  Sequelize.fn(
-                    "ST_MakePoint",
-                    Sequelize.col("longitude"),
-                    Sequelize.col("latitude")
-                  ),
-                  4326
-                ),
-                Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-              ),
-              true
-            ),
+            [Sequelize.Op.and]: arr1
           },
           raw: true,
         }).then((birds) => {

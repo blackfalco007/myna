@@ -11,6 +11,10 @@ const path = require("path");
 const { getCipherInfo } = require("crypto");
 const { constrainedMemory } = require("process");
 const moment = require('moment');
+const buildSpatialFilter =
+        require(
+          "../helper/buildSpatialFilter"
+        );
 
 
 function readFileAsync(filePath, encoding) {
@@ -62,16 +66,7 @@ const UserController = {
     const fileData = filePath.toString("utf-8");
     try {
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      // console.log("entered72");
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      
       const categories = [
         "Vulnerable",
         "Critically Endangered",
@@ -80,27 +75,10 @@ const UserController = {
       ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      // console.log("entered84");
-
+      
       const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
+        buildSpatialFilter(geojson)
       ];
-      // console.log("entered104");
 
       if (start && end) {
         arr1.push(
@@ -116,7 +94,6 @@ const UserController = {
           )
         );
       }
-      console.log("entered105");
       const counts = {};
       const obj = {};
 
@@ -165,15 +142,12 @@ const UserController = {
     const fileData = filePath.toString("utf-8");
     try {
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [
+        buildSpatialFilter(
+        geojson
+      )
+      ];
+
       const categories = [
         "Vulnerable",
         "Critically Endangered",
@@ -183,25 +157,7 @@ const UserController = {
       const start = req.query.start || false;
       const end = req.query.end || false;
 
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
-
+      
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -307,16 +263,13 @@ const UserController = {
 
     try {
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
 
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [
+        buildSpatialFilter(
+        geojson
+      )
+      ];
+
 
       const categories = [
         "Vulnerable",
@@ -326,26 +279,6 @@ const UserController = {
       ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-
-      // Create conditions for geographic filter
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
 
       // Add date filter if `start` and `end` are provided
       if (start && end) {
@@ -479,132 +412,17 @@ const UserController = {
 
   },
 
-  // async graph(req, res) {
-  //   const filePath = req.file.buffer;
-  //   const start = '1900-01-01';
-  //   const end = req.query.end || '2024-05-31';
-  //   const startYear = new Date(start);
-  //   const endYear = new Date(end);
-  //   const fileData = filePath.toString("utf-8");
-  //   // Parse the GeoJSON data
-  //   const geojson = JSON.parse(fileData);
-
-  //   const polygonCoords = geojson.features[0].geometry.coordinates[0];
-  //   const firstPoint = polygonCoords[0];
-  //   const lastPoint = polygonCoords[polygonCoords.length - 1];
-  //   if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-  //     polygonCoords.push(firstPoint); // Add the first point to close the loop
-  //   }
-  //   const polygonText = `POLYGON((${polygonCoords
-  //     .map((point) => point.join(" "))
-  //     .join(", ")}))`;
-   
-  //   const arr1 = [
-  //     Sequelize.where(
-  //       Sequelize.fn(
-  //         "ST_Within",
-  //         Sequelize.fn(
-  //           "ST_SetSRID",
-  //           Sequelize.fn(
-  //             "ST_MakePoint",
-  //             Sequelize.col("longitude"),
-  //             Sequelize.col("latitude")
-  //           ),
-  //           4326
-  //         ),
-  //         Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-  //       ),
-  //       true
-  //     ),
-  //   ];
-  //   if (start && end) {
-  //     arr1.push(
-  //       Sequelize.where(
-  //         Sequelize.fn(
-  //           "TO_DATE",
-  //           Sequelize.col("observationDate"),
-  //           "DD-MM-YYYY"
-  //         ),
-  //         {
-  //           [Op.between]: [start, end], // Filter by date range
-  //         }
-  //       )
-  //     );
-  //   }
-  //   let years = Array.from(
-  //     { length: endYear.getFullYear() - startYear.getFullYear() + 1 },
-  //     (_, i) => startYear.getFullYear() + i
-  //   );
   
-  //   const results = {};
-  
-  //   try { 
-  //     for (let i = 0; i < years.length; i++) {
-  //       const currentYear = years[i];
-  
-  //       const upToCurrentYear = years.slice(0, i + 1);
-  
-  //       const yearConditions = upToCurrentYear.map(year => `%${year}%`);
-  
-  //       const data = await Kinnaur.findAll({
-  //         attributes: [
-  //           [Sequelize.fn('DISTINCT', Sequelize.col('eBirdScientificName')), 'eBirdScientificName']
-  //         ],
-  //         where: {
-  //           [Op.and]: arr1,
-  //           category: ["species", "issf", "domestic"],
-  //           eBirdScientificName: { 
-  //             [Sequelize.Op.not]: null,
-  //           },
-  //           [Sequelize.Op.or]: yearConditions.map(year => ({
-  //             observationDate: {
-  //               [Sequelize.Op.like]: year, 
-  //             },
-  //           })),
-  //         },
-  //         raw: true,
-  //       });
-  
-    
-  //       const count = data.length;
-  //       if (count === 0) {
-  
-  //         years = years.filter(year => year !== currentYear);
-  //         i--; 
-  //       } else if (count > 0) {
-  //         const added =  Object.values(results).includes(count);
-  //         if(added){
-  //           years = years.filter(year => year !== currentYear);
-  //         i--; 
-  //         } else if(!added){
-  //           results[currentYear] = count; 
-
-  //         }
-  //       }
-  //     }
-  
-  //     res.json(results);
-  //   } catch (error) {
-  //     console.error("Error fetching species count by year:", error);
-  //     res.status(500).send("Error fetching data.");
-  //   }
-  // },
-
- 
-
   async graph(req, res) {
     const fileData = req.file.buffer.toString("utf-8");
     const geojson = JSON.parse(fileData);
   
-    const polygonCoords = geojson.features[0].geometry.coordinates[0];
-    const firstPoint = polygonCoords[0];
-    const lastPoint = polygonCoords[polygonCoords.length - 1];
-    if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-      polygonCoords.push(firstPoint); // Close the loop
-    }
-  
-    const polygonText = `POLYGON((${polygonCoords.map(p => p.join(" ")).join(", ")}))`;
-  
+    const arr1 = [
+        buildSpatialFilter(
+        geojson
+      )
+    ];
+
     const start = req.query.start || '01-01-1900';
     const end = req.query.end || '31-05-2024';
   
@@ -628,21 +446,10 @@ const UserController = {
         attributes: ['eBirdScientificName', 'observationDate'],
         where: {
           category: ["species", "issf", "domestic"],
-          eBirdScientificName: { [Op.not]: null },
-          [Op.and]: [
-            Sequelize.where(
-              Sequelize.fn(
-                "ST_Within",
-                Sequelize.fn(
-                  "ST_SetSRID",
-                  Sequelize.fn("ST_MakePoint", Sequelize.col("longitude"), Sequelize.col("latitude")),
-                  4326
-                ),
-                Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-              ),
-              true
-            )
-          ]
+          eBirdScientificName: {
+            [Op.not]: null
+          },
+          [Op.and]: arr1
         },
         raw: true
       });
@@ -695,37 +502,18 @@ const UserController = {
     const filePath = req.file.buffer;
     try {
       const fileData = filePath.toString("utf-8");
+    
       // Parse the GeoJSON data
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+    
+      const arr1 = [
+        buildSpatialFilter(
+        geojson
+      )
+      ];
+
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -978,15 +766,9 @@ const UserController = {
       const fileData = filePath.toString("utf-8");
       // Parse the GeoJSON data
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [
+        buildSpatialFilter(geojson)
+      ];
       const iucnOrder = {
         "Critically Endangered": 0,
         Endangered: 1,
@@ -995,24 +777,6 @@ const UserController = {
       };
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -1251,16 +1015,9 @@ const UserController = {
       const filePath = req.file.buffer;
       const fileData = filePath.toString("utf-8");
       const data = JSON.parse(fileData);
-      const polygonCoords = data.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); 
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
-
+      const arr1 = [
+        buildSpatialFilter(data)
+      ];
       const allowedRegions = [
         "Himalayas",
         "Western Himalayas",
@@ -1281,24 +1038,6 @@ const UserController = {
 
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -1538,35 +1277,11 @@ const UserController = {
       // Read the contents of the file
       const fileData = filePath.toString("utf-8");
       const data = JSON.parse(fileData);
-      const polygonCoords = data.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [
+        buildSpatialFilter(data)
+      ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -1740,35 +1455,9 @@ const UserController = {
       // Read the contents of the file
       const fileData = filePath.toString("utf-8");
       const data = JSON.parse(fileData);
-      const polygonCoords = data.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(data) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2051,35 +1740,9 @@ const UserController = {
     // Parse the GeoJSON data
     try {
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(geojson) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2149,35 +1812,9 @@ const UserController = {
       const fileData = filePath.toString("utf-8");
       // Parse the GeoJSON data
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(geojson) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2232,35 +1869,9 @@ const UserController = {
       const fileData = filePath.toString("utf-8");
       // Parse the GeoJSON data
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(geojson) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2307,37 +1918,11 @@ const UserController = {
       const filePath = req.file.buffer;
       const fileData = filePath.toString("utf-8");
       const data = JSON.parse(fileData);
-      const polygonCoords = data.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0]) {
-        polygonCoords.push(firstPoint);
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(data) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
 
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
-
+      
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2435,35 +2020,9 @@ const UserController = {
       const fileData = filePath.toString("utf-8");
       // Parse the GeoJSON data
       const geojson = JSON.parse(fileData);
-      const polygonCoords = geojson.features[0].geometry.coordinates[0];
-      const firstPoint = polygonCoords[0];
-      const lastPoint = polygonCoords[polygonCoords.length - 1];
-      if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-        polygonCoords.push(firstPoint); // Add the first point to close the loop
-      }
-      const polygonText = `POLYGON((${polygonCoords
-        .map((point) => point.join(" "))
-        .join(", ")}))`;
+      const arr1 = [ buildSpatialFilter(geojson) ];
       const start = req.query.start || false;
       const end = req.query.end || false;
-      const arr1 = [
-        Sequelize.where(
-          Sequelize.fn(
-            "ST_Within",
-            Sequelize.fn(
-              "ST_SetSRID",
-              Sequelize.fn(
-                "ST_MakePoint",
-                Sequelize.col("longitude"),
-                Sequelize.col("latitude")
-              ),
-              4326
-            ),
-            Sequelize.fn("ST_GeomFromText", polygonText, 4326)
-          ),
-          true
-        ),
-      ];
       if (start && end) {
         arr1.push(
           Sequelize.where(
@@ -2527,7 +2086,6 @@ const UserController = {
         raw: true,
       });
       obj.numberOfUniqueLists = observation[0].count;
-
       const sample = await Kinnaur.findAll({
         attributes: [
           [
@@ -2546,7 +2104,6 @@ const UserController = {
         return isNaN(durationMinutes) ? acc : acc + durationMinutes;
       }, 0);
       obj.totalNumberOfHours = Math.floor(sampleCount / 60);
-
       const group = await Kinnaur.findAll({
         attributes: [
           [
@@ -2562,7 +2119,11 @@ const UserController = {
       obj.totalNumberOfObservers = group.length;
       return res.send({ data: obj });
     } catch (err) {
-      res.send({ error: err });
+      console.error("effortsDetails error:", err);
+      res.status(500).send({
+        error: err.message,
+        stack: err.stack
+      });
     }
   },
 };

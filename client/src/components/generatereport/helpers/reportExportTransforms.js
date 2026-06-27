@@ -1,4 +1,4 @@
-import { calculateRoundedValue, HEATMAP_GRID_SIZE } from "./heatmapUtils";
+import { calculateRoundedValue, HEATMAP_GRID_SIZE, getHeatmapStyle } from "./heatmapUtils";
 
 export const buildSoibExportData = (data) =>
   (data || []).map(item => ({
@@ -127,30 +127,44 @@ export const buildSoibExportData = (data) =>
   export const buildHeatmapGeojson = (
   completeListOfSpeciesGi
 ) => {
+
+     if (
+      !Array.isArray(
+        completeListOfSpeciesGi
+      )
+    ) {
+
+      
+      return {
+        type: "FeatureCollection",
+        features: []
+      };
+    }
+
     const locationMap = {};
 
-completeListOfSpeciesGi.forEach(entry => {
+    completeListOfSpeciesGi.forEach(entry => {
 
-  const lat =
-    calculateRoundedValue(
-      entry.latitude
+    const lat =
+      calculateRoundedValue(
+        entry.latitude
+      );
+
+    const lng =
+      calculateRoundedValue(
+        entry.longitude
+      );
+
+    const key =
+      `${lat}X${lng}`;
+
+    if (!locationMap[key]) {
+      locationMap[key] = new Set();
+    }
+
+    locationMap[key].add(
+      entry.groupIdentifier
     );
-
-  const lng =
-    calculateRoundedValue(
-      entry.longitude
-    );
-
-  const key =
-    `${lat}X${lng}`;
-
-  if (!locationMap[key]) {
-    locationMap[key] = new Set();
-  }
-
-  locationMap[key].add(
-    entry.groupIdentifier
-  );
 });
 
 const gridCounts = {};
@@ -187,31 +201,7 @@ Object.entries(gridCounts)
         maxCount
       );
 
-    const heatmapClass =
-    normalizedPercentage >= 70
-        ? ">=70"
-        : normalizedPercentage >= 30
-        ? "30-69"
-        : normalizedPercentage >= 10
-        ? "10-29"
-        : normalizedPercentage >= 3
-        ? "3-9"
-        : normalizedPercentage >= 1
-        ? "1-2"
-        : "0";
-    
-    const fillColor =
-    normalizedPercentage >= 70
-        ? "#562377"
-        : normalizedPercentage >= 30
-        ? "#3949ab"
-        : normalizedPercentage >= 10
-        ? "#5c6bc0"
-        : normalizedPercentage >= 3
-        ? "#7986cb"
-        : normalizedPercentage >= 1
-        ? "#c5cae9"
-        : "#ffffff";
+    const style = getHeatmapStyle(normalizedPercentage);
 
     features.push({
       type: "Feature",
@@ -223,9 +213,9 @@ Object.entries(gridCounts)
 
         normalizedPercentage,
 
-        heatmapClass,
+        heatmapClass: style.label,
         
-        fillColor,
+        fillColor: style.color,
 
         centroidLat,
 

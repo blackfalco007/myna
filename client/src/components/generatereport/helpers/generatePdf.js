@@ -26,6 +26,53 @@ import {
 } from "./generateReportTableData";
 // import { data } from "autoprefixer";
 import { generateFirstPage } from "./generateFirstPage";
+
+function hideGoogleMapControls(container, indices) {
+    const gm = container?.querySelector(".gm-style");
+    if (!gm) return [];
+
+    const hidden = [];
+
+    indices.forEach(i => {
+        if (gm.children[i]) {
+            hidden.push({
+                node: gm.children[i],
+                display: gm.children[i].style.display
+            });
+            gm.children[i].style.display = "none";
+        }
+    });
+
+    return hidden;
+}
+
+function restoreGoogleMapControls(hidden) {
+    hidden.forEach(item => {
+        item.node.style.display = item.display;
+    });
+}
+
+function fixGoogleMapControlsForPdf(doc) {
+
+  doc.querySelectorAll(".gm-style-cc").forEach(cc => {
+
+  const span = cc.querySelector("span");
+
+  if (span && span.textContent.includes("Map data")) {
+
+    cc.style.height = "18px";
+
+    const bg = cc.firstElementChild;
+
+    if (bg)
+      bg.style.height = "18px";
+
+  }
+
+});
+  
+}
+
 export const handleDownloadPdf = async (
   PrintScreen,
   otherScreen,
@@ -96,24 +143,35 @@ export const handleDownloadPdf = async (
     return await html2canvas(ref.current, {
       windowWidth: 1600,
       useCORS: true,
+      onclone: fixGoogleMapControlsForPdf,
     });
   };
   const captureCanvas = async (elementRef) => {
     if (!elementRef.current) return null;
+    
     return await html2canvas(elementRef.current, {
       useCORS: true,
       allowTaint: true,
       logging: true,
-      windowWidth: elementRef.current.scrollWidth,
-      windowHeight: elementRef.current.scrollHeight,
       scale: 2,
+      onclone: fixGoogleMapControlsForPdf,
     });
   };
   setPdfDownloadStatus("Gathering Data...");
+
+  
+  const hidden = hideGoogleMapControls(otherScreen.current, [3,7,12]);
+  
   const otherScreenCanvas = await captureCanvas(otherScreen);
+  restoreGoogleMapControls(hidden);
   const chartRefCanvas = await captureCanvas(chartRef);
+  
+  const hiddenHeatmap = hideGoogleMapControls(heatmapRef.current, [3,7,12]);
   const heatmapRefCanvas = await captureCanvasOld(heatmapRef);
+  restoreGoogleMapControls(hiddenHeatmap);
+
   const citationCanvas = await captureCanvas(citationMetadataRef);
+
 
 
   const lockPdf = async (jsPDFDoc, pdfName) => {
@@ -156,11 +214,14 @@ export const handleDownloadPdf = async (
   });
 
   setPdfDownloadStatus("Writing Images...");
-  const seasonalChartCanvas = await html2canvas(seasonalChartDiv.current, {
-    windowWidth: 2000,
-    useCORS: true,
-  });
-  
+  let seasonalChartCanvas = null;
+
+  if (getSeasonalChartData?.length > 0) {
+      seasonalChartCanvas = await html2canvas(seasonalChartDiv.current, {
+          windowWidth: 2000,
+          useCORS: true,
+      });
+  }
   
   setPdfDownloadStatus("Almost Done...");
   setPdfDownloadStatus("Please wait...");
@@ -556,10 +617,7 @@ export const handleDownloadPdf = async (
     const mostCommonSpeciesHeight =
       (mostCommonSpeciesImgProperty.height * pdfWidth) /
       mostCommonSpeciesImgProperty.width;
-    console.log("ADDING MOST COMMON SPECIES PAGE");
-    console.log("height", mostCommonSpeciesHeight);
-    console.log("pdfWidth", pdfWidth);
-
+    
     pdf.addImage(
       mostCommonSpeciesImg,
       "PNG",
@@ -570,10 +628,9 @@ export const handleDownloadPdf = async (
       "one",
       "fast"
     );
-    console.log("DONE ADDING MOST COMMON SPECIES PAGE");
   }
 
-  if(seasonalChartCanvas) {
+  if (getSeasonalChartData?.length > 0) {
   pdf.addPage();
   
   const sesonalChartImg = seasonalChartCanvas.toDataURL("image/png");
@@ -593,14 +650,15 @@ export const handleDownloadPdf = async (
     );
   }
 
-  if (otherScreenCanvas && getSeasonalChartData?.length) {
+  if (otherScreenCanvas) {
     pdf.addPage();
 
+    
     const secondImg = otherScreenCanvas.toDataURL("image/png");
     const hotspotImageProperties = pdf.getImageProperties(secondImg);
     const hotspotImageHeight =
       (hotspotImageProperties.height * 100) / hotspotImageProperties.width;
-     pdf.addImage(
+      pdf.addImage(
       secondImg,
       "PNG",
       15,
@@ -648,9 +706,9 @@ export const handleDownloadPdf = async (
   }
 
 
-      pdf.addPage();
       
-      if(chartRefCanvas){
+      if (chartRefCanvas && getSeasonalChartData?.length > 0) {
+        pdf.addPage();
         const secondImg2 = chartRefCanvas.toDataURL("image/png");
           // console.log(secondImg2,"secondImg2")
           if (secondImg2 && secondImg2.startsWith("data:image/png")) {
@@ -684,11 +742,12 @@ export const handleDownloadPdf = async (
       }
   
   
-      pdf.addPage();
       
       const seventhImg = heatmapRefCanvas?.toDataURL("image/png");
       
       if(seventhImg && seventhImg.startsWith("data:image/png")){ 
+      pdf.addPage();
+      
       const heatmapImageProperties = pdf.getImageProperties(seventhImg);
       const pageWidthHmap = pdf.internal.pageSize.getWidth();
       const imgWidthHmap = 280; // Fixed width (you can modify this)
@@ -714,8 +773,8 @@ export const handleDownloadPdf = async (
         }
 
 
-  pdf.addPage();
   if (shouldDrawTable(completeListOfSpeciesData)) {
+    pdf.addPage();
     pdf.autoTable({
       headStyles: {
         fillColor: [154, 114, 105],
