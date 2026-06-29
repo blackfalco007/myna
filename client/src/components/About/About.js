@@ -62,11 +62,11 @@ function About() {
       <div className="container mt-12 leading-8 gandhi-family">
         <b>M</b>apping <b>Y</b>our <b>N</b>eighbourhood <b>A</b>vifauna (MYNA) is a data exploration tool
         published by the{" "}
-        <a href="https://www.stateofindiasbirds.in/" target="_blank">State of India's Birds</a>{" "}
+        <a href="https://www.stateofindiasbirds.in/" target="_blank" rel="noopener noreferrer">State of India's Birds</a>{" "}
         (SoIB) partnership to explore the underlying large-scale data used in
         the SoIB assessments. This data is based entirely on eBird data that was
         downloaded from
-        <a href="https://ebird.org/india" target="_blank">
+        <a href="https://ebird.org/india" target="_blank" rel="noopener noreferrer">
           {" "}
           www.ebird.org/india  
         </a>
@@ -80,13 +80,14 @@ function About() {
         <a
           href="https://ebird.org/india/news/ebird-sensitive-species"
           target="_blank"
+          rel="noopener noreferrer"
         >
           https://ebird.org/india/news/ebird-sensitive-species
         </a>
         ) is not included in these summaries.{" "}
       </div>
       <div className="grid place-content-center ">
-        <img width={250} src={logo}></img>
+        <img width={250} src={logo} alt="MYNA logo"></img>
       </div>
       <div className="container mt-12 leading-8 gandhi-family">
         Contact us at{" "}
@@ -115,6 +116,7 @@ function About() {
             style={{ textDecoration: "none" }}
             className="text-[#dbb931]"
             target="_blank"
+            rel="noopener noreferrer"
             href="https://www.alphanzo.io"
           >
             Alphanzo Technology Pvt Ltd

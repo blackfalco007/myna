@@ -1,5 +1,5 @@
-import React, { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { Map, Marker, GoogleApiWrapper, Polygon, InfoWindow } from 'google-maps-react';
+import React, { Fragment, useEffect, useState, useRef, useMemo } from "react";
+import { Map, Marker, GoogleApiWrapper, Polygon } from 'google-maps-react';
 import Table2X2 from "./reportcomponents/Table2X2";
 import Table3XN from "./reportcomponents/Table3XN";
 import ProgressChart from "./reportcomponents/ProgressChart";
@@ -41,10 +41,14 @@ import { APP_CONFIG } from "../../config/appConfig";
 import { HEATMAP_CLASSES, HEATMAP_GRID_SIZE } from "./helpers/heatmapUtils";
 import { buildSoibExportData, buildIucnExportData, buildEndemicExportData, buildWaterbirdExportData, buildCompleteListExportData, buildHeatmapGeojson} from "./helpers/reportExportTransforms";
 import CircularProgress from "@mui/material/CircularProgress";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
+import Button from "@mui/material/Button";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 // import { position } from "html2canvas/dist/types/css/property-descriptors/position";
 function Report(props) {
 
+  const [copied, setCopied] = useState(false);
   const googleMapRef = useRef(null);
   const {
     boundary,
@@ -78,6 +82,7 @@ function Report(props) {
     area,
     completeListOfSpeciesFetchSuccessFully,
     mediumForReport,
+    selectedLocality
   } = props;
 
   
@@ -109,6 +114,7 @@ function Report(props) {
     generateReportId({
       selectedState,
       selectedCounty,
+      selectedLocality,
       startDate,
       endDate,
       dataEndDate 
@@ -118,6 +124,7 @@ function Report(props) {
     generateApaCitation({
       selectedState,
       selectedCounty,
+      selectedLocality,
       startDate,
       endDate
     });
@@ -127,10 +134,24 @@ function Report(props) {
       reportId,
       selectedState,
       selectedCounty,
+      selectedLocality,
       startDate,
       endDate,
       dataEndDate
     });
+  
+  const copyBibTex = async () => {
+    try {
+      await navigator.clipboard.writeText(bibtexCitation);
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
   const generatedTimestamp =
       new Date().toLocaleString("en-IN", {
       year: "numeric",
@@ -193,7 +214,7 @@ function Report(props) {
 
 
     const buildMetadataJson = () => ({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       reportId,
       reportName,
       generatedTimestamp,
@@ -203,6 +224,7 @@ function Report(props) {
       endDate,
       state: selectedState,
       district: selectedCounty,
+      locality: selectedLocality || "",
       areaSqKm: area,
       apaCitation,
       bibtexCitation,
@@ -338,11 +360,11 @@ function Report(props) {
     });
   };
 
-  const [pdfDownloadStatus, setPdfDownloadStatus] = useState("Download Pdf");
+  const [pdfDownloadStatus, setPdfDownloadStatus] = useState("");
   const [changeLayoutForReport, setChangeLayoutForReport] = useState(false);
-  const [activeMarker, setActiveMarker] = useState(null);
+  const hotspotHoverPanelRef = useRef(null);
+  const hotspotHoverNameRef = useRef(null);
   const [center, setCenter] = useState(null);
-  const [showInfoWindow, setShowInfoWindow] = useState(false);
   const [newZoom, setNewZoom] = useState(null);
   const [gridBounds, setGridBounds] = useState({ latMin: 0, latMax: 0, lngMin: 0, lngMax: 0 });
   const [polygonData, setPolygonData] = useState([]);
@@ -355,11 +377,20 @@ function Report(props) {
   const [mapZoomOut,setMapZoomOut] = useState(false);
   const [highestNumber, sethighestNumber] = useState(null);
   const [newBufferdata,setNewBufferdata] = useState(null);
+  const heatmapReadyRef = useRef(false);
   
   const heatmapGeojson =
     buildHeatmapGeojson(
       completeListOfSpeciesGi
   );
+
+  useEffect(() => {
+    heatmapReadyRef.current = !showHeatMap;
+  }, [showHeatMap, completeListOfSpeciesGi.length, area, dataForMap, boundary]);
+
+  const markHeatmapReadyForExport = () => {
+    heatmapReadyRef.current = true;
+  };
 
   useEffect(() => {
     if (Object.keys(allYearsCount).length > 0) {
@@ -376,15 +407,15 @@ function Report(props) {
   
 // console.log("showHeatMap",showHeatMap);
 
-  const downloadPdfProgress = {
-    "Download Pdf": "w-[0%]",
-    "Creating Layout..": "w-[20%]",
-    "Gathering Data...": "w-[30%]",
-    "Creating Tables...": "w-[50%]",
-    "Writing Images...": "w-[60%]",
-    "Almost Done...": "w-[70%]",
-    "Download will begin shortly...": "w-[90%]",
-    Completed: "w[100%]",
+  const pdfStatusLabel = {
+    "Creating Layout..": "Layout...",
+    "Gathering Data...": "Gathering...",
+    "Creating Tables...": "Tables...",
+    "Writing Images...": "Images...",
+    "Almost Done...": "Finalizing...",
+    "Download will begin shortly...": "Downloading...",
+    "Preparing report...": "Preparing...",
+    "Waiting for maps...": "Maps..."
   };
   const today = new Date();
   const formattedDate =
@@ -609,14 +640,55 @@ const onMapReady = (mapProps, map) => {
 
 
 
+  const waitForNextPaint = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve);
+      });
+    });
+
+  const waitForCondition = (predicate, timeoutMs = 8000) =>
+    new Promise((resolve) => {
+      const startedAt = Date.now();
+
+      const check = () => {
+        if (predicate() || Date.now() - startedAt >= timeoutMs) {
+          resolve();
+          return;
+        }
+
+        window.setTimeout(check, 100);
+      };
+
+      check();
+    });
+
+  const waitForPdfCaptureReadiness = async () => {
+    setPdfDownloadStatus("Preparing report...");
+
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+
+    await waitForNextPaint();
+    setPdfDownloadStatus("Waiting for maps...");
+    await waitForCondition(() => !showHeatMap || heatmapReadyRef.current);
+    await waitForNextPaint();
+  };
+
   useEffect(() => {
-    let delayTimeout;
+    let cancelled = false;
 
-    if (changeLayoutForReport) {
-      delayTimeout = setTimeout(() => {
-        createTrackMiddlewareForPdfGenerate(mediumForReport)
+    const prepareAndDownload = async () => {
+      if (!changeLayoutForReport) return;
 
-        handleDownloadPdf(
+      try {
+        await waitForPdfCaptureReadiness();
+        if (cancelled) return;
+
+        createTrackMiddlewareForPdfGenerate(mediumForReport);
+
+        await handleDownloadPdf(
           PrintScreen,
           otherScreen,
           heatmapRef,
@@ -632,6 +704,7 @@ const onMapReady = (mapProps, map) => {
           completeListOfSpecies,
           selectedState,
           selectedCounty,
+          selectedLocality,
           getHotspotAreas,
           setPdfDownloadStatus,
           setChangeLayoutForReport,
@@ -678,15 +751,19 @@ const onMapReady = (mapProps, map) => {
           endDate,
           getSeasonalChartData
         );
-      }, 3000);
-    }
-    return () => {
-      // Clear the timeout if the component is unmounted or changeLayoutForReport changes
-      if (delayTimeout) {
-        clearTimeout(delayTimeout);
+      } catch (error) {
+        console.error("PDF generation failed", error);
+        setPdfDownloadStatus("");
+        setChangeLayoutForReport(false);
       }
     };
-  }, [changeLayoutForReport, otherScreen, chartRef, heatmapRef]);
+
+    prepareAndDownload();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [changeLayoutForReport]);
 
 
   const [initialCenter, setInitialCenter] = useState({ lat: 25.21, lng: 79.32 });
@@ -821,11 +898,42 @@ const onMapReady = (mapProps, map) => {
   }
 
   const [downloadTriggered, setDownloadTriggered] = useState(false);
+  const [scrollLockExpired, setScrollLockExpired] = useState(false);
 
   const reportReady =
-  getCountByScientificName?.total !== undefined &&
-  completeListOfSpeciesFetchSuccessFully &&
-  isBarChartloaded;
+    getCountByScientificName?.total !== undefined &&
+    completeListOfSpeciesFetchSuccessFully &&
+    isBarChartloaded;
+
+  useEffect(() => {
+    if (reportReady) {
+      setScrollLockExpired(false);
+      return;
+    }
+
+    const failOpenTimer = window.setTimeout(() => {
+      setScrollLockExpired(true);
+    }, 12000);
+
+    return () => {
+      window.clearTimeout(failOpenTimer);
+    };
+  }, [reportReady, selectedState, selectedCounty, selectedLocality]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const shouldLockScroll = changeLayoutForReport || (!reportReady && !scrollLockExpired);
+
+    if (shouldLockScroll) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = previousOverflow || "";
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [reportReady, scrollLockExpired, changeLayoutForReport]);
 
   const buttonBase =
   "flex items-center justify-center gap-2 rounded-md px-4 py-2 font-semibold transition-all duration-200 shadow-sm w-full sm:w-auto";
@@ -872,18 +980,10 @@ const buttonDisabled =
     cursor-not-allowed`;
 
   const handleDownloadClick = () => {
-    setMapZoomOut(true)   
-    if (otherScreen.current) {
-      otherScreen.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        triggerDownload(true);
-      }, 1000);
-      setTimeout(() => {
-        setMapZoomOut(false);
-      }, 25000);
-    } else {
-      triggerDownload(false);
-    }
+    if (pdfDownloadStatus || !reportReady) return;
+
+    setMapZoomOut(true);
+    triggerDownload(true);
   };
 
 
@@ -891,16 +991,14 @@ const buttonDisabled =
   const triggerDownload = (value) => {
     setDownloadTriggered(value);
     console.log('Initiating PDF download...');
-
     setChangeLayoutForReport(value);
-    setTimeout(() => {
-      scrollToTop();
-    }, 1000);
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  useEffect(() => {
+    if (!changeLayoutForReport && mapZoomOut) {
+      setMapZoomOut(false);
+    }
+  }, [changeLayoutForReport, mapZoomOut]);
 
 
   const timeoutRef = useRef(null);
@@ -918,29 +1016,21 @@ const buttonDisabled =
   }, [convertedData, editedData, boundaryData, formattedData, props.google]);
 
 
-  const handleMarkerClick = (marker) => {
-    setActiveMarker(marker);
-    setShowInfoWindow(true);
-  };
-  const [capturedMarkers, setCapturedMarkers] = useState([]);
-  useEffect(() => {
-    if (changeLayoutForReport) {
-      const mapMarkers = hotspotArray.map(marker => ({
-        id: marker.localityId,
-        position: { lat: marker.latitude, lng: marker.longitude },
-        onMouseover: () => handleMarkerClick(marker),
-        onMouseout: () => setShowInfoWindow(false),
-      }));
-      setCapturedMarkers(mapMarkers);
-    } else {
-      setCapturedMarkers(hotspotArray.map(marker => ({
-        id: marker.localityId,
-        position: { lat: marker.latitude, lng: marker.longitude },
-        onMouseover: () => handleMarkerClick(marker),
-        onMouseout: () => setShowInfoWindow(false),
-      })));
+  const showHotspotHover = (marker) => {
+    if (hotspotHoverNameRef.current) {
+      hotspotHoverNameRef.current.textContent = marker?.locality || marker?.name || "Unnamed hotspot";
     }
-  }, [changeLayoutForReport, getHotspotAreas]);
+
+    if (hotspotHoverPanelRef.current) {
+      hotspotHoverPanelRef.current.style.display = "block";
+    }
+  };
+
+  const hideHotspotHover = () => {
+    if (hotspotHoverPanelRef.current) {
+      hotspotHoverPanelRef.current.style.display = "none";
+    }
+  };
 
   const roundToTwoDecimals = (num) => Math.round(num * 100) / 100;
 
@@ -992,12 +1082,151 @@ const buttonDisabled =
             className={changeLayoutForReport && "p-8"}
             style={{ borderRadius: "0 0 0 0", backgroundColor: "#DAB830" }}
           >
+
+{/* ---------- Mobile Header ---------- */}
+<div className="block md:hidden">
+
+{/* Top Row */}
+<div className="relative flex items-center px-3 pt-3">
+
+  {/* Logo */}
+  <div className="w-[90px] flex-shrink-0 flex flex-col items-start">
+    <img
+      src={Logo}
+      alt="logo"
+      className="h-[80px] w-[90px] object-contain"
+    />
+  <h1
+    className="myna-text -mt-2"
+    style={{ marginLeft: "13px" }}
+  >
+    MYNA
+  </h1>
+  </div>
+
+  {/* Title */}
+  <div className="flex-1 min-w-0 flex flex-col justify-center items-start p1-1 pr-10">
+
+    <div
+      className="w-full overflow-hidden whitespace-nowrap text-ellipsis text-xl font-bold text-white text-left"
+      title={reportName ? `Birds of ${reportName}` : ""}
+    >
+      {reportName ? `Birds of ${reportName}` : ""}
+    </div>
+
+    {selectedState && (
+      <div
+        className="w-full overflow-hidden whitespace-nowrap text-ellipsis text-lg font-semibold text-white mt-2 text-left"
+        title={selectedState}
+      >
+        State: {selectedState}
+      </div>
+    )}
+
+    {selectedCounty && (
+      <div
+        className="w-full overflow-hidden whitespace-nowrap text-ellipsis text-lg font-semibold text-white mt-1 text-left"
+        title={selectedCounty}
+      >
+        District: {selectedCounty}
+      </div>
+    )}
+
+    {selectedLocality && (
+      <div
+        className="w-full overflow-hidden whitespace-nowrap text-ellipsis text-base text-white mt-1 text-left"
+        title={selectedLocality}
+      >
+        Locality: {selectedLocality}
+      </div>
+    )}
+
+  </div>
+
+  {/* Close Button */}
+  <CloseIcon
+    onClick={closeHandler}
+    sx={{
+      position: "absolute",
+      top: 8,
+      right: 8,
+      fontSize: 30,
+      cursor: "pointer"
+    }}
+  />
+
+</div>
+  <div className="flex items-center justify-between border-t border-yellow-300 mt-3 pt-3 px-3">
+
+  <div className="flex items-center text-white">
+
+    <CalendarTodayOutlinedIcon
+      sx={{
+        fontSize: 18,
+        marginRight: "8px"
+      }}
+    />
+
+    <span className="text-sm">
+      {dayjs(startDate).format("DD/MM/YYYY")}
+      {" – "}
+      {dayjs(endDate).format("DD/MM/YYYY")}
+    </span>
+
+  </div>
+
+  <div className="flex items-center gap-5">
+
+  <div
+    onClick={!pdfDownloadStatus ? handleDownloadClick : undefined}
+    className={`flex items-center gap-2 text-white ${
+      pdfDownloadStatus
+        ? "cursor-default"
+        : "cursor-pointer hover:opacity-80"
+    }`}
+  >
+    {pdfDownloadStatus ? (
+      <CircularProgress
+        size={16}
+        thickness={5}
+        sx={{ color: "white" }}
+      />
+    ) : (
+      <FileDownloadOutlinedIcon sx={{ fontSize: 20 }} />
+    )}
+
+    <span className="text-sm font-semibold whitespace-nowrap">
+      {pdfDownloadStatus
+        ? (pdfStatusLabel[pdfDownloadStatus] || pdfDownloadStatus)
+        : "PDF"}
+    </span>
+  </div>
+
+  <div
+    onClick={downloadDataPackage}
+    className="flex items-center gap-1 cursor-pointer text-white"
+  >
+    <FileDownloadOutlinedIcon sx={{ fontSize: 20 }} />
+    <span className="text-sm font-semibold">
+      Data
+    </span>
+  </div>
+
+</div>
+</div>
+
+</div>
+   
+
+  {/* ---------- Desktop Header ---------- */}
+          <div className="hidden md:block">
+
             <div
               className={`${changeLayoutForReport && "p-8"
                 }flex justify-center content-center items-center w-100`}
             >
-              <Grid container spacing={3}>
-                <Grid item xs className="flex justify-center">
+              <Grid container spacing={2} alignItems="center" justifyContent="space-between">
+                <Grid item xs={12} md={3} className="flex justify-center">
                   <div>
                     <img
                       src={Logo}
@@ -1012,13 +1241,13 @@ const buttonDisabled =
                     </div>
                   </div>
                 </Grid>
-                <Grid item xs={8} className="flex xsm:justify-end sm:justify-end  lg:justify-center md:justify-center xlg:justify-center ">
+                <Grid item xs={12} md={6}  className="flex xsm:justify-end sm:justify-end  lg:justify-center md:justify-center xlg:justify-center ">
                   <div className={` my-auto`}>
-                    <div className="main-heading  text-[1.1rem] md:text-2xl lg:text-2xl xlg:text-2xl xsm:text-right sm:text-right sm:pr-[18px] xsm:pr-[18px]">
+                  <div className="main-heading text-center text-[1.1rem] md:text-2xl lg:text-2xl xlg:text-2xl px-4">
                       {reportName ? "Birds Of " + reportName : ""}
                     </div>
                     {selectedState !== "" && (
-                      <div className="flex flex-col xsm:flex-col sm:flex-col md:flex-row lg:flex-row xl:flex-row justify-between sm:pr-[18px] xsm:pr-[18px] ">
+                      <div className="flex flex-col md:flex-row md:justify-center items-center gap-2 md:gap-10">
                       <center className=" text-[1.1rem] md:text-2xl lg:text-2xl xlg:text-2xl font-sans text-white font-bold xsm:text-right sm:text-right">
                           {/* State: Himachal Pradesh */}
                           {selectedState !== "" && `State: ${selectedState}`}
@@ -1029,101 +1258,120 @@ const buttonDisabled =
                         </center>
                       </div>
                     )}
+                    {/* Locality */}
+                    {selectedLocality && (
+                      <div className="text-center mt-2 text-[1.1rem] md:text-2xl font-sans text-white font-bold">
+                        Locality: {selectedLocality}
+                      </div>
+                    )}
                   </div>
                 </Grid>
-                <Grid item xs>
-                  <div className={`flex justify-end py-3 px-8 xsm:pr-[18px] `}>
+                <Grid item xs={12} md={3}>
+                  <div className={`flex flex-col md:items-end items-center gap-2 py-3 px-3 xsm:pr-[18px] `}>
                     <div
                       className={
                         "d-flex justify-content-endent-end"
                       }
                     >
-                  {window.innerWidth < 768 &&
-
-                      <div className="flex justify-end">
-                        {startDate !== "" && (
-                          <div className="flex justify-end mt-1 ">
-                            <center className="text-[.9rem] md:text-2xl lg:text-2xl xlg:text-2xl  gandhi-family text-gray-100 pr-[18px]">
-                              {startDate !== "" &&
-                                `Dates : ${dayjs(startDate).format("DD/MM/YYYY") + " "}–${" " + dayjs(endDate).format("DD/MM/YYYY")
-                                }`}
-                            </center>
-                          </div>
-                        )}
-                      </div>
-                   }
-                      <div className="me-4">
-
+                  
 {!reportReady ? (
 
-  <div className="flex items-center gap-3 text-white font-semibold">
+  <div className="flex items-center justify-end gap-3 text-white">
     <CircularProgress
-      size={18}
+      size={20}
       sx={{ color: "white" }}
     />
-    <span>{pdfDownloadStatus}</span>
+    <span className="text-base font-semibold">
+      Generating report...
+    </span>
   </div>
 
 ) : (
 
-  getCountByScientificName?.total && (
+  <div className="flex items-center justify-end gap-5">
 
-    <button
-      onClick={handleDownloadClick}
-      className={buttonEnabled}
+  {getCountByScientificName?.total && (
+    <div
+      onClick={!pdfDownloadStatus ? handleDownloadClick : undefined}
+      className={`flex items-center gap-2 text-white transition-opacity ${
+        pdfDownloadStatus
+          ? "cursor-default"
+          : "cursor-pointer hover:opacity-80"
+      }`}
     >
-      <FileDownloadOutlinedIcon fontSize="small" />
-      <span>Download PDF</span>
-    </button>
+      {pdfDownloadStatus ? (
+        <CircularProgress
+          size={18}
+          thickness={5}
+          sx={{ color: "white" }}
+        />
+      ) : (
+        <FileDownloadOutlinedIcon sx={{ fontSize: 24 }} />
+      )}
 
-  )
+      <span className="text-base font-semibold whitespace-nowrap hidden md:inline">
+        {pdfDownloadStatus
+        ? (pdfStatusLabel[pdfDownloadStatus] || pdfDownloadStatus)
+        : "PDF"}
+      </span>
 
-)}
+     </div>
+  )}
+
+  <div
+    onClick={downloadDataPackage}
+    className="flex items-center gap-1 cursor-pointer text-white hover:opacity-80 transition-opacity"
+  >
+    <FileDownloadOutlinedIcon sx={{ fontSize: 24 }} />
+    <span className="text-base font-semibold">
+      Data
+    </span>
+  </div>
+
+  <Tooltip title="Close" arrow>
+    <CloseIcon
+      onClick={closeHandler}
+      sx={{
+        cursor: "pointer",
+        fontSize: 32,
+        "&:hover": {
+          opacity: 0.8,
+        },
+      }}
+    />
+  </Tooltip>
 
 </div>
 
-                        <div className="d-flex align-items-center" style={{ gap: "12px" }}>
-    {reportReady && (
-    <button
-        onClick={downloadDataPackage}
-        className={buttonEnabled}
-    >
-        <FileDownloadOutlinedIcon fontSize="small" />
-        <span>Download Data</span>
-    </button>
 )}
-
-                        <Tooltip title="Close" arrow>
-  <CloseIcon
-    onClick={reportReady ? closeHandler : undefined}
-    style={{
-        cursor: reportReady ? "pointer" : "not-allowed",
-        opacity: reportReady ? 1 : 0.35,
-        fontSize: 28,
-    }}
-/>
-</Tooltip>
-                      </div>
-
                     </div>
                   </div>
                 </Grid>
               </Grid>
             </div>
-            {window.innerWidth >=768 &&
+            
+         
             <div className="flex justify-end">
               {startDate !== "" && (
                 <div className="flex justify-end mt-1 ">
                   <center className="text-[1.1rem] md:text-2xl lg:text-2xl xlg:text-2xl  gandhi-family text-gray-100 pr-[18px]">
+                    <CalendarTodayOutlinedIcon
+                      sx={{
+                        fontSize: 26,
+                        marginRight: "8px"
+                      }}
+                    />
+                    
                     {startDate !== "" &&
-                      `Dates : ${dayjs(startDate).format("DD/MM/YYYY") + " "}–${" " + dayjs(endDate).format("DD/MM/YYYY")
+                      `${dayjs(startDate).format("DD/MM/YYYY") + " "}–${" " + dayjs(endDate).format("DD/MM/YYYY")
                       }`}
                   </center>
                 </div>
               )}
             </div>
-            }
-          </Card>
+            </div>
+            </Card>
+      
         </div>
         {getCountByScientificName?.total !== undefined && completeListOfSpeciesFetchSuccessFully && isBarChartloaded ? (
           <div>
@@ -1502,36 +1750,41 @@ const buttonDisabled =
                         }}
                       />
                     )}
-                    {(capturedMarkers?.length > 0 ? capturedMarkers : getHotspotAreas).map((marker) => (
-                      <Marker
-                        key={marker.id}
-                        position={marker.position}
-                        onMouseover={marker.onMouseover}
-                      />
-                    ))}
-
                     {getHotspotAreas && hotspotArray.map(marker => (
                       <Marker
                         key={marker.localityId}
                         position={{ lat: marker.latitude, lng: marker.longitude }}
-                        onMouseover={() => handleMarkerClick(marker)}
-                        onMouseout={() => setShowInfoWindow(false)}
+                        onMouseover={() => showHotspotHover(marker)}
+                        onMouseout={hideHotspotHover}
                       />
                     ))}
-
-                    {getHotspotAreas && activeMarker && hotspotArray.map(marker => (
-                      <InfoWindow
-                        key={marker.localityId}
-                        position={{ lat: activeMarker.latitude, lng: marker.longitude }}
-                        visible={showInfoWindow && activeMarker === marker}
-                        zIndex={10000}
-                      >
-                        <div style={{ zIndex: '1000' }}>
-                          <p>{marker.locality}</p>
-                        </div>
-                      </InfoWindow>
-                    ))}
                   </Map>
+                  <div
+                    ref={hotspotHoverPanelRef}
+                    style={{
+                      display: "none",
+                      position: "absolute",
+                      top: 12,
+                      right: 12,
+                      background: "rgba(255,255,255,0.94)",
+                      border: "1px solid #d6d6d6",
+                      borderRadius: "6px",
+                      padding: "8px 12px",
+                      minWidth: "180px",
+                      maxWidth: "280px",
+                      fontSize: "12px",
+                      fontFamily: '"Gandhi Sans Regular", Arial, sans-serif',
+                      color: "#333",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                      zIndex: 1000,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                      Hotspot
+                    </div>
+                    <div ref={hotspotHoverNameRef} style={{ lineHeight: 1.35 }} />
+                  </div>
                   {area != null ? (
                     <div
   style={{
@@ -1607,7 +1860,9 @@ const buttonDisabled =
               </div>
               <CustomHeatMap 
                 sethighestNumber={sethighestNumber} 
-                mapZoomOut={mapZoomOut} 
+                mapZoomOut={mapZoomOut}
+                exportMode={changeLayoutForReport} 
+                onHeatmapReady={markHeatmapReadyForExport}
                 area={area} 
                 className="md:absolute lg:absolute" 
                 onMapReady={onMapReady} 
@@ -1768,7 +2023,7 @@ const buttonDisabled =
             </div>
 
             <div className="text-sm text-gray-800">
-              v{APP_CONFIG.VERSION}
+              {APP_CONFIG.VERSION}
             </div>
 
           </div>
@@ -1792,28 +2047,50 @@ const buttonDisabled =
     </div>
 
     {/* BibTeX */}
-
     <div>
 
-      <div className="text-lg md:text-2xl gandhi-family-bold text-[#9A7269] mb-3">
-        BibTeX
+      {/* Heading + Copy Button */}
+      <div className="flex items-center justify-between mb-3">
+
+        <div className="text-lg md:text-2xl gandhi-family-bold text-[#9A7269]">
+          BibTeX
+        </div>
+
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<ContentCopyIcon />}
+          onClick={copyBibTex}
+          sx={{
+            backgroundColor: "#9A7269",
+            textTransform: "none",
+            boxShadow: "none",
+            "&:hover": {
+              backgroundColor: "#7f5c54",
+              boxShadow: "none"
+            }
+          }}
+        >
+          {copied ? "Copied!" : "Copy"}
+        </Button>
+
       </div>
 
+      {/* BibTeX Block */}
       <div className="bg-[#1E1E1E] text-[#D4D4D4] rounded-lg p-4 overflow-x-auto">
 
         <pre className="whitespace-pre-wrap text-xs md:text-sm leading-6 font-mono">
-
           {bibtexCitation}
-
         </pre>
 
       </div>
 
     </div>
 
-  </Card>
+    </Card>
 
-</div>          </div>
+      </div>          
+      </div>
         ) : (
           <ReoprtSkeleton />
         )}
@@ -1828,40 +2105,34 @@ const buttonDisabled =
           style={{ gap: "8px" }}
         >
  
-  {reportReady && (
-    <button
-      onClick={handleDownloadClick}
-      className={buttonEnabled}
-    >
-      <FileDownloadOutlinedIcon fontSize="small" />
-      <span>Download PDF</span>
-    </button>
-  )}
-
-  {reportReady && (
-    <button
-      onClick={downloadDataPackage}
-      className={buttonEnabled}
-    >
-      <FileDownloadOutlinedIcon fontSize="small" />
-      <span>Download Data</span>
-    </button>
-  )}
         </div>
       </div>
-
-      <div
-        className={`top-0 transition-all ease-linear duration-100  bg-[#2e7d32] h-[10px] ${downloadPdfProgress[pdfDownloadStatus]}`}
-      ></div>
 
       <div
         ref={footer}
         className={`lmd:grid  grid-cols-3  text-center text-gray-100 p-3 break-normal font-sans bg-[#9A7269] ${changeLayoutForReport && "pb-5"
           }`}
       >
-        <div className="col-span-2 text-left px-6 md:px-10 lg:px-14 gandhi-family break-all">
-          {footerText}
-        </div>
+        <div className="col-span-2 px-6 md:px-10 lg:px-14 gandhi-family">
+
+  {/* Desktop */}
+  <div className="hidden md:block text-left break-all">
+    {footerText}
+  </div>
+
+  {/* Mobile */}
+  <div className="block md:hidden text-center leading-6">
+    {footerText.split(" | ").map((part, index) => (
+      <div
+        key={index}
+        className={index === 1 ? "break-all" : ""}
+      >
+        {part}
+      </div>
+    ))}
+  </div>
+
+</div>
         <div
           className={`${changeLayoutForReport && "invisible"
             } font-medium gandhi-family text-center md:text-right lg:right xlg:right break-normal`}
@@ -1871,6 +2142,7 @@ const buttonDisabled =
             style={{ textDecoration: "none" }}
             className="text-[#dbb931]"
             target="_blank"
+            rel="noopener noreferrer"
             href="https://www.alphanzo.io"
           >
             Alphanzo Technology Pvt Ltd

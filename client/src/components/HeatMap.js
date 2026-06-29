@@ -20,12 +20,18 @@
    const [props, setProps] = useState({ paths: [] });
    const [polyCount, setPolyCount] = useState(null);
    const [newBufferdata,setNewBufferdata] = useState(null);
+   const [mapIdle, setMapIdle] = useState(false);
    const roundToTwoDecimals = (num) => Math.round(num * 1000) / 1000;
 
   
    useEffect(()=>{
      data.setPolygonsCount(polyCount);
    },[polyCount])
+   useEffect(() => {
+     if (polyCount !== null && (!maxValue || mapIdle)) {
+       data.onHeatmapReady?.({ polygonCount: polyCount });
+     }
+   }, [polyCount, maxValue, mapIdle, data.onHeatmapReady]);
 
   //  console.log("uniqueIdentifiersCount",uniqueIdentifiersCount)
 
@@ -615,6 +621,7 @@ const generateGrid = useMemo(() => {
          google={data.google}
           // onReady={!data.mapZoomOut &&  data.onMapReady}
           onReady={(mapProps, map) => {
+            setMapIdle(false);
             if (data.bufferData) {
               map.data.addGeoJson(data.bufferData);
               map.data.setStyle({
@@ -639,6 +646,10 @@ const generateGrid = useMemo(() => {
   }
 
   map.fitBounds(bounds, 30);
+
+  map.addListener("idle", () => {
+    setMapIdle(true);
+  });
             // if (data.orgPolyCoords) {
             //   map.data.addGeoJson(data.orgPolyCoords); // if orgPolyCoords is valid GeoJSON
             // }

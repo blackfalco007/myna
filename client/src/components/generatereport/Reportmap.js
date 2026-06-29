@@ -1,7 +1,7 @@
 //for scale
 
 import React, { useEffect, useState } from "react";
-import { MapContainer,TileLayer, GeoJSON,useMap } from "react-leaflet";
+import { MapContainer, GeoJSON,useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import Ziptogeojson from "./Ziptogeojson";
 //import { EditControl } from "react-leaflet-draw";
@@ -20,8 +20,6 @@ import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import MyControls from "./MyControls";
 import Boundary from "./Boundary";
 import * as turf from '@turf/turf';
-import Slider from '@mui/material/Slider';
-import { TbRulerMeasure } from "react-icons/tb";
 import { useDrawing } from "./contexts/Mapcontext";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -67,9 +65,8 @@ function Reportmap(props) {
   const [anchorEl, setAnchorEl] = useState(null);
   // const [bufferData, setBufferData] = useState(null);
   const [value, setValue] = useState(0);
-  const [openScale, setOpenScale] = useState(false);
   // const [orgPolyCoords, setOrgPolyCoords] = useState(null);
-  const [polyMapPropsCords, setpolyMapPropsCords] = useState(null);
+  const [, setpolyMapPropsCords] = useState(null);
   const { startPolygonDrawing, setStartPolygonDrawing } = useDrawing();
   const [polyEnd, setPolyEnd] = useState(false);
   
@@ -366,7 +363,7 @@ setEditedData(coordinates[0]);
   };
 
   const createBuffer = (geojson, radius, units = 'kilometers') => {
-   if(value  == 0){
+   if(value === 0){
     props.setBufferData(null);
     return
    }
@@ -437,21 +434,6 @@ setEditedData(coordinates[0]);
   }, [props.boundary, props.data,props.newPolygon,editedData]); 
 
 
-  
-  
-
-  
-  // console.log("value",value)
-  const handleScale =()=>{
-    if( (props.selectedCounty && props.selectedState && !props.selectedLocality) ||
-    props.data !== null ||
-   //  props.boundary ||
-    props.newPolygon){
-      setOpenScale(!openScale);
-    }
-    return
-  }
-  
   // console.log(`buffer-${value}`)
   // console.log("bufferData",bufferData);
   // console.log("props.newPolygon",props.newPolygon);

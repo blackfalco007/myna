@@ -73,6 +73,53 @@ function fixGoogleMapControlsForPdf(doc) {
   
 }
 
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const waitForNextPaint = () =>
+  new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
+
+const waitForImages = async (element, timeoutMs = 6000) => {
+  if (!element) return;
+
+  const images = Array.from(element.querySelectorAll("img"));
+  const pendingImages = images.filter(img => !img.complete || img.naturalWidth === 0);
+
+  if (pendingImages.length === 0) return;
+
+  await Promise.race([
+    Promise.all(
+      pendingImages.map(img => new Promise(resolve => {
+        img.addEventListener("load", resolve, { once: true });
+        img.addEventListener("error", resolve, { once: true });
+      }))
+    ),
+    wait(timeoutMs)
+  ]);
+};
+
+const waitForCaptureTarget = async (element, timeoutMs = 6000) => {
+  if (!element) return;
+
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  await waitForImages(element, timeoutMs);
+  await waitForNextPaint();
+};
+
+const getCaptureWindowSize = (element, fallbackWidth = 1600) => {
+  const rect = element.getBoundingClientRect();
+
+  return {
+    windowWidth: Math.ceil(Math.max(element.scrollWidth || 0, rect.width || 0, fallbackWidth)),
+    windowHeight: Math.ceil(Math.max(element.scrollHeight || 0, rect.height || 0, 900)),
+  };
+};
 export const handleDownloadPdf = async (
   PrintScreen,
   otherScreen,
@@ -89,6 +136,7 @@ export const handleDownloadPdf = async (
   completeListOfSpecies,
   selectedState,
   selectedCounty,
+  selectedLocality,
   getHotspotAreas,
   setPdfDownloadStatus,
   setChangeLayoutForReport,
@@ -135,26 +183,54 @@ export const handleDownloadPdf = async (
   setPdfDownloadStatus("Creating Layout..");
   const pdf = new jsPDF({ format: "a4" });
   // capturing multiple images
-  const captureCanvasOld = async (ref) => {
+  const captureCanvasOld = async (ref, options = {}) => {
     if (!ref?.current) {
       console.warn("Skipping capture: Element not found.");
       return null;
     }
+
+    await waitForCaptureTarget(ref.current);
+
+    const captureWindow = getCaptureWindowSize(
+      ref.current,
+      options.windowWidth || 1600
+    );
+
     return await html2canvas(ref.current, {
-      windowWidth: 1600,
-      useCORS: true,
-      onclone: fixGoogleMapControlsForPdf,
-    });
-  };
-  const captureCanvas = async (elementRef) => {
-    if (!elementRef.current) return null;
-    
-    return await html2canvas(elementRef.current, {
+      ...captureWindow,
+      backgroundColor: "#ffffff",
       useCORS: true,
       allowTaint: true,
-      logging: true,
-      scale: 2,
+      logging: false,
+      scale: options.scale || 1.5,
+      scrollX: 0,
+      scrollY: 0,
       onclone: fixGoogleMapControlsForPdf,
+      ...options,
+    });
+  };
+
+  const captureCanvas = async (elementRef, options = {}) => {
+    if (!elementRef?.current) return null;
+
+    await waitForCaptureTarget(elementRef.current);
+    
+    const captureWindow = getCaptureWindowSize(
+      elementRef.current,
+      options.windowWidth || 1600
+    );
+
+    return await html2canvas(elementRef.current, {
+      ...captureWindow,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      scale: options.scale || 1.5,
+      scrollX: 0,
+      scrollY: 0,
+      onclone: fixGoogleMapControlsForPdf,
+      ...options,
     });
   };
   setPdfDownloadStatus("Gathering Data...");
@@ -193,14 +269,23 @@ export const handleDownloadPdf = async (
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
+  const downloadName = pdfName.toLowerCase().endsWith('.pdf')
+    ? pdfName
+    : `${pdfName}.pdf`;
+
   a.href = url;
-  a.download = pdfName;
+  a.download = downloadName;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
 
   setPdfDownloadStatus("Completed");
   setTimeout(() => {
-      setPdfDownloadStatus("Download Pdf");
+      setPdfDownloadStatus("");
       setChangeLayoutForReport(false);
     }, 2000);
   };
@@ -208,26 +293,23 @@ export const handleDownloadPdf = async (
 
   setPdfDownloadStatus("Creating Tables...");
             
-  const mostCommonSpeciesDivCanvas = await html2canvas(mostCommonSpeciesDiv.current, {
+  const mostCommonSpeciesDivCanvas = await captureCanvas(mostCommonSpeciesDiv, {
     windowWidth: 2000,
-    useCORS: true,
   });
 
   setPdfDownloadStatus("Writing Images...");
   let seasonalChartCanvas = null;
 
   if (getSeasonalChartData?.length > 0) {
-      seasonalChartCanvas = await html2canvas(seasonalChartDiv.current, {
+      seasonalChartCanvas = await captureCanvas(seasonalChartDiv, {
           windowWidth: 2000,
-          useCORS: true,
       });
   }
   
   setPdfDownloadStatus("Almost Done...");
   setPdfDownloadStatus("Please wait...");
-  const canvas6 = await html2canvas(footer.current, {
+  const canvas6 = await captureCanvas(footer, {
     windowWidth: 1300,
-    useCORS: true,
   });
   // Generating data for various tables
   const iucnData = generateIUCNData(getDataForIucnRedListTable);
@@ -972,14 +1054,30 @@ export const handleDownloadPdf = async (
     pdf.setFont("GandhiFont", "bold");
     pdf.setTextColor("#ffffff");
     const pdfReportName = reportName.toUpperCase();
-    pdf.text("BIRDS OF " + pdfReportName, 105, 18, "center");
+    pdf.text("Birds of " + pdfReportName, 105, 14, "center");
     pdf.setFontSize(12);
-    if (selectedState !== "") {
-      pdf.text("State: " + selectedState, 70, 27, "center");
-      pdf.text("District: " + selectedCounty, 140, 27, "center");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pdfLocality = (selectedLocality || "")
+      .replace(/\s*\([^)]*\)/g, "") // Remove "(ಕನ್ನಡ)" etc.
+      .trim();
+    if (selectedState) {
+      pdf.text("State: " + selectedState, 70, 23, "center");
+      pdf.text("District: " + selectedCounty, 140, 23, "center");
+
+      if (pdfLocality) {
+      pdf.text(
+        "Locality: " + pdfLocality,
+        pageWidth / 2,
+        30,
+        { align: "center" }
+      );
+    }
     }
     pdf.setFontSize(10);
-    pdf.text("Dates: " + dayjs(startDate).format("DD/MM/YYYY") + " " + "–" + " " + dayjs(endDate).format("DD/MM/YYYY"), 183, 35, "center");
+    const dateRange =
+      `${dayjs(startDate).format("DD/MM/YYYY")} – ${dayjs(endDate).format("DD/MM/YYYY")}`;
+
+    pdf.text(`Dates: ${dateRange}`, 183, 35, "center");
     pdf.setFontSize(12);
 
     pdf.setFont('GandhiSans-Regular', 'normal')
@@ -1046,7 +1144,7 @@ export const handleDownloadPdf = async (
   setPdfDownloadStatus("Completed");
   const handleClick = () => {
     setTimeout(() => {
-      setPdfDownloadStatus("Download Pdf");
+      setPdfDownloadStatus("");
       setChangeLayoutForReport(false);
     }, 2000);
   };

@@ -1,16 +1,18 @@
 import React from "react";
 
+const isMobile = window.innerWidth < 640;
+
 const headerCellStyle = {
   backgroundColor: "#F3EDE8",
   color: "#000",
   fontWeight: 700,
-  padding: "8px 40px",
+  padding: isMobile ? "8px 10px" : "8px 40px",
   textAlign: "left",
   verticalAlign: "top"
 };
 
 const bodyCellStyle = {
-  padding: "8px 40px",
+  padding: isMobile ? "8px 10px" : "8px 40px",
   verticalAlign: "top",
   borderBottom: "1px solid rgba(224, 224, 224, 1)"
 };
