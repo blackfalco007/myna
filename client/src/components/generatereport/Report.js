@@ -1756,6 +1756,7 @@ const buttonDisabled =
                         position={{ lat: marker.latitude, lng: marker.longitude }}
                         onMouseover={() => showHotspotHover(marker)}
                         onMouseout={hideHotspotHover}
+                        onClick={() => showHotspotHover(marker)}
                       />
                     ))}
                   </Map>

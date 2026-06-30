@@ -81,13 +81,16 @@ function Reportmap(props) {
             color: "rgb(51, 136, 255)",
           },
         });
+      } else {
+        map.pm.disableDraw("Polygon");
+      }
   /*
         map.on("pm:create", () => {
           setStartPolygonDrawing(false);
           setPolyEnd(true);
           map.pm.disableDraw();
         });*/
-      }
+      
     }, [startPolygonDrawing, map]);
   
     useEffect(() => {

@@ -653,6 +653,7 @@ function Main(props) {
     }
   };
   const handleGeographyClick = (emitter) => {
+    setStartPolygonDrawing(false);
     setUploadedFileName(null);
         setBoundary(null);
     // setDistrictJsonData(null);
@@ -674,6 +675,7 @@ function Main(props) {
     }
   };
   const handleGeoFile = (e) => {
+    setStartPolygonDrawing(false);
     setMediumForReport("jsonR")
     setShowGeographySign(false);
     handleMouseLeave();
